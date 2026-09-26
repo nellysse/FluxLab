@@ -303,7 +303,6 @@ export default function App() {
                   <span className="text-sm font-black text-[#FFD84D]">
                     {selectedPart === 'resistor' && t.partResistor}
                     {selectedPart === 'wire' && t.partWire}
-                    {selectedPart === 'diode' && t.partDiode}
                   </span>
                 </div>
 
@@ -319,11 +318,10 @@ export default function App() {
 
               <div className="space-y-2">
                 <span className="text-xs font-bold text-[#A1B5D8]">Выберите деталь для установки:</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     { id: 'resistor', label: t.partResistor },
-                    { id: 'wire', label: t.partWire },
-                    { id: 'diode', label: t.partDiode }
+                    { id: 'wire', label: t.partWire }
                   ].map(part => (
                     <button
                       key={part.id}
