@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const MENTOR_URL = `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/ask-mentor`;
-const STARS_KEY = "fluxlabStars";
-const SOUND_KEY = "fluxlabSound";
+// ============================================================================
+// CONSTANTS & BRAND CONFIGURATION
+// ============================================================================
 
-const C = {
-  deep: "#0f1a30",
-  panel: "#1c2c4e",
-  warm: "#ff7aa8",
-  electric: "#4fe3b0",
-  danger: "#ff6b4a",
-  text: "#f3ecdf",
-  muted: "#a9b3c9",
-  gold: "#e8c77a",
-  border: "rgba(244,236,224,0.14)",
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const MENTOR_URL = `${API_BASE}/api/ask-mentor`;
+const STARS_KEY = "fluxlab_stars_v2";
+const SOUND_KEY = "fluxlab_sound_v2";
+const LANG_KEY = "fluxlab_lang_v2";
+
+const BRAND = {
+  space: "#081C36", // Deep Space Background
+  card: "#0D2547", // Card Container Background
+  border: "rgba(53, 214, 255, 0.2)", // Glassmorphism Border
+  blue: "#377DFF", // Orbit Blue (Primary Accent)
+  cyan: "#35D6FF", // Ion Cyan (High-Energy Accent)
+  yellow: "#FFD84D", // Core Yellow (Energy Core / Stars)
+  white: "#F4F8FC", // Lab White (Primary Text)
+  muted: "#A1B5D8", // Muted Text
+  crimson: "#FF5353", // Danger / Burnt State
+  green: "#26D07C", // Safe / Success
 };
+
+// ============================================================================
+// VECTOR SVG ICONS
+// ============================================================================
 
 const ICONS = {
   activity:
@@ -24,45 +35,36 @@ const ICONS = {
   cable:
     '<path d="M17 19a1 1 0 0 1-1-1v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a1 1 0 0 1-1 1z"/><path d="M17 21v-2"/><path d="M19 14V6.5a1 1 0 0 0-7 0v11a1 1 0 0 1-7 0V10"/><path d="M21 21v-2"/><path d="M3 5V3"/><path d="M4 10a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a2 2 0 0 1-2 2z"/><path d="M7 5V3"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
-  circle_check_big:
-    '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
-  droplets:
-    '<path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>',
+  circle_check:
+    '<path d="M21.8 10A10 10 0 1 1 17 3.3"/><path d="m9 11 3 3L22 4"/>',
   flame:
     '<path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/>',
-  layers:
-    '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
   lightbulb:
     '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
-  message_circle:
-    '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
-  mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
-  move_right: '<path d="M18 8L22 12L18 16"/><path d="M2 12H22"/>',
-  signal:
-    '<path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/>',
-  sliders_horizontal:
-    '<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
-  smartphone:
-    '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
-  sprout:
-    '<path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3"/><path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4"/><path d="M5 21h14"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
-  trees:
-    '<path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z"/><path d="M7 16v6"/><path d="M13 19v3"/><path d="M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.5"/>',
-  wifi: '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
-  wind: '<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>',
-  zap: '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>',
-  star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
-  volume_2:
-    '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/>',
-  volume_x:
-    '<path d="M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z"/><path d="m16.5 14.5 5-5"/><path d="m16.5 9.5 5 5"/>',
-  trophy:
-    '<path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/>',
+  sparkles:
+    '<path d="M11 2.8a1 1 0 0 1 2 0l1 5.6a2 2 0 0 0 1.6 1.6l5.6 1a1 1 0 0 1 0 2l-5.6 1a2 2 0 0 0-1.6 1.6l-1 5.6a1 1 0 0 1-2 0l-1-5.6a2 2 0 0 0-1.6-1.6l-5.6-1a1 1 0 0 1 0-2l5.6-1a2 2 0 0 0 1.6-1.6z"/>',
+  star: '<path d="M11.5 2.3a.5.5 0 0 1 1 0l2.3 4.7a2.1 2.1 0 0 0 1.6 1.2l5.2.7a.5.5 0 0 1 .3.9l-3.7 3.6a2.1 2.1 0 0 0-.6 1.9l.9 5.1a.5.5 0 0 1-.8.6L13 18.6a2.1 2.1 0 0 0-2 0l-4.6 2.4a.5.5 0 0 1-.8-.6l.9-5.1a2.1 2.1 0 0 0-.6-1.9L2.2 9.8a.5.5 0 0 1 .3-.9l5.2-.7a2.1 2.1 0 0 0 1.6-1.2z"/>',
   rotate_ccw:
     '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
-  sparkles:
-    '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>',
+  volume_2:
+    '<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.8"/>',
+  volume_x:
+    '<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="m16.5 14.5 5-5"/><path d="m16.5 9.5 5 5"/>',
+  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  trophy:
+    '<path d="M10 14.7V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.7V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.9 10h1.6A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.1 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/>',
+  download:
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  rocket:
+    '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+  waves:
+    '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+  thermometer:
+    '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>',
+  wifi: '<path d="M12 20h.01"/><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/>',
+  wind: '<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>',
+  bot: '<rect width="18" height="12" x="3" y="6" rx="2"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M12 2v4"/><path d="M2 10h1"/><path d="M21 10h1"/>',
 };
 
 function Ico({ name, size = 20, className = "", style }) {
@@ -86,957 +88,18 @@ function Ico({ name, size = 20, className = "", style }) {
   );
 }
 
-const STR = {
-  ru: {
-    common: {
-      appName: "FluxLab",
-      part_resistor: "Резистор",
-      part_wire: "Провод",
-      part_lamp: "Лампочка",
-      part_battery: "Батарея",
-      part_capacitor: "Конденсатор",
-      part_stabilizer: "Стабилизатор",
-      part_diode: "Диод",
-      slotEmpty: "пусто",
-      testBtn: "Подать ток",
-      resetBtn: "Сброс",
-      mentorBtn: "AI Ментор",
-      backBtn: "Карта",
-      warehouseTitle: "Склад деталей — выбери и тапни на слот",
-      workbenchTitle: "Собери цепь",
-      tryAgain: "Попробуй ещё раз — подумай, какая деталь решает именно эту проблему.",
-      footer: "FluxLab · Naryn · Issyk-Kul · Osh",
-      labReset: "Сбросить значения",
-      attemptLabel: "Попытка",
-      mentorLoading: "Ментор думает…",
-      mentorFallbackTitle: "Локальный ментор",
-    },
-    welcome: {
-      kicker: "FLUXLAB",
-      title: "Инженер внутри тебя",
-      subtitle:
-        "Три реальные поломки в трёх регионах Кыргызстана. Собери схему своими руками — и спаси ситуацию.",
-      startBtn: "Начать путешествие",
-    },
-    map: {
-      title: "Выбери задание",
-      subtitle: "Три региона — три разные поломки",
-      progress: (n) => `${n} из 3 заданий выполнено`,
-      trophyTitle: "Все миссии пройдены!",
-      trophySub: (n, max) => `Ты прошёл все миссии FluxLab · ${n} из ${max} ⭐`,
-    },
-    missions: {
-      naryn: {
-        pinLabel: "Нарын",
-        missionLabel: "МИССИЯ 1 · НАРЫН, ЖАЙЛОО",
-        missionText:
-          "У чабана на пастбище сломался интернет-роутер. Солнечная батарея даёт 24 В, а роутеру нужно ровно 12 В. Подключишь напрямую — сгорит. Собери схему и спаси связь с миром.",
-        panelLabel: "Панель",
-        panelVolt: "24 В",
-        deviceLabel: "Роутер",
-        deviceVolt: "нужно 12 В",
-        successTitle: "Ура! Интернет работает",
-        successBody:
-          "Резистор снизил напряжение с 24 В до нужных 12 В. Связь с миром восстановлена.",
-        fails: {
-          empty: {
-            title: "Роутер сгорел",
-            body: "В цепи ничего не было. Все 24 В ударили прямо в роутер — прибор не выдержал напряжения.",
-          },
-          wire: {
-            title: "Роутер сгорел",
-            body: "Провод сам по себе не сопротивляется току — напряжение дошло до роутера таким же, каким вышло из панели: 24 В.",
-          },
-          lamp: {
-            title: "Роутер сгорел",
-            body: "Лампочка светится, но почти не снижает напряжение — до роутера всё равно дошло слишком много.",
-          },
-          battery: {
-            title: "Роутер сгорел ещё сильнее",
-            body: "Батарея добавляет своё напряжение поверх панели — стало ещё хуже, а не лучше.",
-          },
-          capacitor: {
-            title: "Роутер сгорел",
-            body: "Конденсатор накапливает заряд, а не снижает напряжение постоянно — скачок всё равно дошёл до роутера.",
-          },
-        },
-        mentorQuestion: "Как снизить напряжение с 24V до 12V с помощью делителя?",
-        labTitle: "Лаборатория: закон делителя напряжения",
-        formula: (
-          <>
-            U<sub>out</sub> = U<sub>in</sub> × R<sub>2</sub> / (R<sub>1</sub> + R<sub>2</sub>)
-          </>
-        ),
-        lUin: "Напряжение панели U",
-        lR1: "Резистор R1",
-        lR2: "Резистор R2",
-        lUout: "Напряжение на роутере U",
-        okMsg: "Безопасно для роутера",
-        badHi: "Слишком много — сгорит",
-        badLo: "Слишком мало — не запустится",
-      },
-      issykkul: {
-        pinLabel: "Иссык-Куль",
-        missionLabel: "МИССИЯ 2 · ИССЫК-КУЛЬ, ЮРТОЧНЫЙ ЛАГЕРЬ",
-        missionText:
-          "На берегу Иссык-Куля туристы заряжают телефоны от ветрогенератора. Ветер усиливается, и напряжение скачет до 20 В, а зарядной станции нужно стабильных 5 В. Не выровняешь напряжение — скачок сожжёт все телефоны разом.",
-        panelLabel: "Ветрогенератор",
-        panelVolt: "скачет до 20 В",
-        deviceLabel: "Зарядная станция",
-        deviceVolt: "нужно 5 В",
-        successTitle: "Ура! Телефоны заряжаются",
-        successBody:
-          "Стабилизатор выровнял скачущее напряжение до ровных 5 В — теперь зарядка работает даже при сильном ветре.",
-        fails: {
-          empty: {
-            title: "Станция сгорела",
-            body: "В цепи ничего не было — скачок в 20 В ударил прямо по зарядной станции.",
-          },
-          resistor: {
-            title: "Станция сгорела",
-            body: "Резистор снижает напряжение только на фиксированную величину. Когда ветер усилился и скачок вырос, резистор за ним не успел — станция всё равно сгорела.",
-          },
-          wire: {
-            title: "Станция сгорела",
-            body: "Провод не меняет напряжение вообще — скачки долетели до станции без изменений.",
-          },
-          battery: {
-            title: "Станция сгорела ещё сильнее",
-            body: "Батарея добавила своё напряжение поверх генератора — стало только хуже.",
-          },
-          lamp: {
-            title: "Станция сгорела",
-            body: "Лампочка светится, но не выравнивает скачки напряжения — станция всё равно получила опасный скачок.",
-          },
-        },
-        mentorQuestion: "Почему для скачущего напряжения нужен стабилизатор, а не резистор?",
-        labTitle: "Лаборатория: резистор против стабилизатора",
-        formulaResistor: (
-          <>
-            U<sub>out</sub> = U<sub>in</sub> − U<sub>пад</sub>, где U<sub>пад</sub> = 9 В (фиксировано)
-          </>
-        ),
-        formulaStabilizer: (
-          <>
-            U<sub>out</sub> = 5 В, пока U<sub>in</sub> ≥ 5.5 В (держит постоянно)
-          </>
-        ),
-        modeResistor: "Резистор",
-        modeStabilizer: "Стабилизатор",
-        lUin: "Напряжение генератора U",
-        lUout: "Напряжение на станции U",
-        okMsg: "Стабильные 5 В — телефоны заряжаются",
-        badHi: "Скачок — сожжёт телефоны",
-        badLo: "Слишком мало — не заряжает",
-      },
-      osh: {
-        pinLabel: "Ош",
-        missionLabel: "МИССИЯ 3 · ОШ, ФЕРМЕРСКАЯ ДОЛИНА",
-        missionText:
-          "На ферме в Ошской долине насос для полива питается от солнечной панели через аккумулятор. Ночью панель не вырабатывает ток, и заряженный аккумулятор начинает «отдавать» ток обратно в панель — это может её сжечь. Нужна деталь, которая пропускает ток только в одну сторону.",
-        panelLabel: "Панель",
-        panelVolt: "днём: 18 В",
-        deviceLabel: "Насос",
-        deviceVolt: "через акк.: 12 В",
-        successTitle: "Ура! Насос защищён и поливает поле",
-        successBody:
-          "Диод пропускает ток только в одну сторону — днём заряжает насос, а ночью не даёт току течь обратно и портить панель.",
-        fails: {
-          empty: {
-            title: "Панель повреждена",
-            body: "Ток без всякой преграды потёк обратно ночью и повредил панель.",
-          },
-          resistor: {
-            title: "Панель повреждена",
-            body: "Резистор снижает силу тока в обе стороны одинаково — обратный ток всё равно прошёл и повредил панель, просто чуть слабее.",
-          },
-          wire: {
-            title: "Панель повреждена",
-            body: "Провод пропускает ток в любую сторону одинаково — ночью ток свободно потёк обратно.",
-          },
-          battery: {
-            title: "Стало ещё хуже",
-            body: "Ещё одна батарея добавила напряжения в цепь, но не решила проблему обратного тока.",
-          },
-          lamp: {
-            title: "Панель повреждена",
-            body: "Лампочка не управляет направлением тока — обратный поток всё равно дошёл до панели.",
-          },
-        },
-        mentorQuestion: "Как диод защищает солнечную панель от обратного тока ночью?",
-        labTitle: "Лаборатория: закон Ома и обратный ток",
-        formulaDayForward: (
-          <>
-            I = (U<sub>панели</sub> − U<sub>акк.</sub>) / R = (18 − 12) / R
-          </>
-        ),
-        formulaNightBlocked: <>I = 0 — диод блокирует обратный ток</>,
-        formulaNightNoDiode: (
-          <>
-            I = U<sub>акк.</sub> / R = 12 / R (течёт назад!)
-          </>
-        ),
-        dayBtn: "День",
-        nightBtn: "Ночь",
-        diodeOnBtn: "С диодом",
-        diodeOffBtn: "Без диода",
-        lR: "Сопротивление цепи R",
-        lI: "Сила тока I",
-        okDayMsg: "Ток идёт вперёд — насос заряжается",
-        okNightMsg: "Диод блокирует обратный ток — панель цела",
-        badMsg: "Ток течёт назад — панель повреждается",
-      },
-    },
-  },
-  ky: {
-    common: {
-      appName: "FluxLab",
-      part_resistor: "Резистор",
-      part_wire: "Зым",
-      part_lamp: "Лампочка",
-      part_battery: "Батарея",
-      part_capacitor: "Конденсатор",
-      part_stabilizer: "Стабилизатор",
-      part_diode: "Диод",
-      slotEmpty: "бош",
-      testBtn: "Токту бер",
-      resetBtn: "Баштан",
-      mentorBtn: "AI Ментор",
-      backBtn: "Карта",
-      warehouseTitle: "Буюмдар кампасы — тандап, слотко бас",
-      workbenchTitle: "Схеманы жыйна",
-      tryAgain: "Дагы аракет кыл — кайсы деталь так ушул көйгөйдү чечерин ойлон.",
-      footer: "FluxLab · Нарын · Ысык-Көл · Ош",
-      labReset: "Маанилерди баштапкы абалга келтир",
-      attemptLabel: "Аракет",
-      mentorLoading: "Ментор ойлонууда…",
-      mentorFallbackTitle: "Жергиликтүү ментор",
-    },
-    welcome: {
-      kicker: "FLUXLAB",
-      title: "Ичиңдеги инженер",
-      subtitle:
-        "Кыргызстандын үч аймагында үч реалдуу бузулуу. Схеманы өз колуң менен жыйна да, жагдайды сакта.",
-      startBtn: "Саякатты баштоо",
-    },
-    map: {
-      title: "Тапшырманы тандо",
-      subtitle: "Үч аймак — үч башка бузулуу",
-      progress: (n) => `${n} / 3 тапшырма аткарылды`,
-      trophyTitle: "Бардык тапшырмалар аткарылды!",
-      trophySub: (n, max) => `Сен FluxLab миссияларын бүтүрдүң · ${n} / ${max} ⭐`,
-    },
-    missions: {
-      naryn: {
-        pinLabel: "Нарын",
-        missionLabel: "МИССИЯ 1 · НАРЫН, ЖАЙЛОО",
-        missionText:
-          "Жайлоодогу чабандын роутери бузулду. Күн батареясы 24 В берет, ал эми роутерге так 12 В керек. Түз туташтырсаң — күйүп кетет. Схеманы жыйна да, дүйнө менен байланышты сакта.",
-        panelLabel: "Панель",
-        panelVolt: "24 В",
-        deviceLabel: "Роутер",
-        deviceVolt: "12 В керек",
-        successTitle: "Ура! Интернет иштейт",
-        successBody:
-          "Резистор чыңалууну 24 В дан керектүү 12 В га түшүрдү. Дүйнө менен байланыш калыбына келди.",
-        fails: {
-          empty: {
-            title: "Роутер күйдү",
-            body: "Схемага эч нерсе коюлган жок. 24 В толугу менен роутерге тийди — прибор чыдай алган жок.",
-          },
-          wire: {
-            title: "Роутер күйдү",
-            body: "Зым өзү токко каршылык көрсөтпөйт — чыңалуу панелден чыккандай эле 24 В бойдон роутерге жетти.",
-          },
-          lamp: {
-            title: "Роутер күйдү",
-            body: "Лампочка жанат, бирок чыңалууну дээрлик түшүрбөйт — роутерге дагы эле өтө көп чыңалуу жетти.",
-          },
-          battery: {
-            title: "Роутер дагы катуу күйдү",
-            body: "Батарея панелдин чыңалуусуна өзүнүкүн кошот — жакшырган жок, тескерисинче жаманыраак болду.",
-          },
-          capacitor: {
-            title: "Роутер күйдү",
-            body: "Конденсатор заряд топтойт, чыңалууну туруктуу түшүрбөйт — секирик баары бир роутерге жетет.",
-          },
-        },
-        mentorQuestion: "Кантип 24V чыңалууну 12V чейин азайтса болот?",
-        labTitle: "Лаборатория: чыңалуу бөлгүчтүн мыйзамы",
-        formula: (
-          <>
-            U<sub>чыг.</sub> = U<sub>кир.</sub> × R<sub>2</sub> / (R<sub>1</sub> + R<sub>2</sub>)
-          </>
-        ),
-        lUin: "Панелдин чыңалуусу U",
-        lR1: "Резистор R1",
-        lR2: "Резистор R2",
-        lUout: "Роутердеги чыңалуу U",
-        okMsg: "Роутер үчүн коопсуз",
-        badHi: "Өтө көп — күйөт",
-        badLo: "Өтө аз — иштебейт",
-      },
-      issykkul: {
-        pinLabel: "Ысык-Көл",
-        missionLabel: "МИССИЯ 2 · ЫСЫК-КӨЛ, БОЗ ҮЙ ЛАГЕРИ",
-        missionText:
-          "Ысык-Көлдүн жээгинде туристтер телефондорун шамал генераторунан кубаттайт. Шамал күчөгөндө чыңалуу 20 В чейин секирет, ал эми станцияга туруктуу 5 В керек. Чыңалууну теңдебесең, секирик бардык телефондорду өрттөп кетет.",
-        panelLabel: "Шамал генератору",
-        panelVolt: "20 В чейин секирет",
-        deviceLabel: "Кубаттоо станциясы",
-        deviceVolt: "5 В керек",
-        successTitle: "Ура! Телефондор кубатталууда",
-        successBody:
-          "Стабилизатор секирген чыңалууну тегиз 5 В га түшүрдү — эми күчтүү шамалда да кубаттоо иштейт.",
-        fails: {
-          empty: {
-            title: "Станция күйдү",
-            body: "Схемага эч нерсе коюлган жок — 20 В секирик станцияга түз тийди.",
-          },
-          resistor: {
-            title: "Станция күйдү",
-            body: "Резистор чыңалууну бир калыпта гана азайтат. Шамал күчөп секирик өскөндө, резистор ага жетише алган жок — станция баары бир күйдү.",
-          },
-          wire: {
-            title: "Станция күйдү",
-            body: "Зым чыңалууну эч өзгөртпөйт — секирик өзгөрүүсүз станцияга жетти.",
-          },
-          battery: {
-            title: "Станция дагы катуу күйдү",
-            body: "Батарея генератордун үстүнө өз чыңалуусун кошту — жагдай жакшырган жок.",
-          },
-          lamp: {
-            title: "Станция күйдү",
-            body: "Лампочка жанат, бирок чыңалуу секиригин теңдебейт — станция коркунучтуу секирикти дагы деле алды.",
-          },
-        },
-        mentorQuestion: "Эмне үчүн секирген чыңалууга стабилизатор керек, резистор эмес?",
-        labTitle: "Лаборатория: резистор менен стабилизатор",
-        formulaResistor: (
-          <>
-            U<sub>чыг.</sub> = U<sub>кир.</sub> − U<sub>түшүм</sub>, U<sub>түшүм</sub> = 9 В (өзгөрбөйт)
-          </>
-        ),
-        formulaStabilizer: (
-          <>
-            U<sub>чыг.</sub> = 5 В, U<sub>кир.</sub> ≥ 5.5 В болсо (туруктуу кармайт)
-          </>
-        ),
-        modeResistor: "Резистор",
-        modeStabilizer: "Стабилизатор",
-        lUin: "Генератордун чыңалуусу U",
-        lUout: "Станциядагы чыңалуу U",
-        okMsg: "Туруктуу 5 В — телефондор кубатталууда",
-        badHi: "Секирик — телефондорду өрттөйт",
-        badLo: "Өтө аз — кубаттабайт",
-      },
-      osh: {
-        pinLabel: "Ош",
-        missionLabel: "МИССИЯ 3 · ОШ, ФЕРМЕР ӨРӨӨНҮ",
-        missionText:
-          "Ош өрөөнүндөгү фермада сугаруу насосу күн панели жана аккумулятор менен иштейт. Түнү панель ток чыгарбайт, ал эми аккумулятор токту панелге тескери агыза баштайт — бул панелди бузушу мүмкүн. Токту бир гана багытта өткөрүүчү деталь керек.",
-        panelLabel: "Панель",
-        panelVolt: "күндүз: 18 В",
-        deviceLabel: "Насос",
-        deviceVolt: "акк. аркылуу: 12 В",
-        successTitle: "Ура! Насос корголду жана талааны сугарууда",
-        successBody:
-          "Диод токту бир гана багытта өткөрөт — күндүз насосту кубаттайт, түнү токтун артка агып, панелди бузушуна жол бербейт.",
-        fails: {
-          empty: {
-            title: "Панель бузулду",
-            body: "Ток эч кандай тоскоолдуксуз түнү артка агып, панелди бузду.",
-          },
-          resistor: {
-            title: "Панель бузулду",
-            body: "Резистор токту эки багытта тең эле азайтат — тескери ток баары бир өттү, панелди бузду, жөн гана бир аз алсызыраак.",
-          },
-          wire: {
-            title: "Панель бузулду",
-            body: "Зым токту эки багытта тең бирдей өткөрөт — түнү ток эркин артка агып кетти.",
-          },
-          battery: {
-            title: "Жагдай начарлады",
-            body: "Дагы бир батарея схемага чыңалуу кошту, бирок тескери ток маселесин чечкен жок.",
-          },
-          lamp: {
-            title: "Панель бузулду",
-            body: "Лампочка токтун багытын башкарбайт — тескери агым баары бир панелге жетти.",
-          },
-        },
-        mentorQuestion: "Диод түнкү тескери токтан күн панелин кантип коргойт?",
-        labTitle: "Лаборатория: Ом мыйзамы жана тескери ток",
-        formulaDayForward: (
-          <>
-            I = (U<sub>панель</sub> − U<sub>акк.</sub>) / R = (18 − 12) / R
-          </>
-        ),
-        formulaNightBlocked: <>I = 0 — диод тескери токту бөгөйт</>,
-        formulaNightNoDiode: (
-          <>
-            I = U<sub>акк.</sub> / R = 12 / R (артка агат!)
-          </>
-        ),
-        dayBtn: "Күндүз",
-        nightBtn: "Түн",
-        diodeOnBtn: "Диод менен",
-        diodeOffBtn: "Диодсуз",
-        lR: "Схеманын каршылыгы R",
-        lI: "Ток күчү I",
-        okDayMsg: "Ток алга агууда — насос кубатталууда",
-        okNightMsg: "Диод тескери токту бөгөйт — панель бүтүн",
-        badMsg: "Ток артка агууда — панель бузулууда",
-      },
-    },
-  },
-};
+// ============================================================================
+// AUDIO SYNTHESIZER (WEB AUDIO API)
+// ============================================================================
 
-const MISSIONS = [
-  {
-    id: "naryn",
-    pinIcon: "mountain",
-    color: "#ff7aa8",
-    top: "46.7%",
-    left: "59.9%",
-    panelIcon: "sun",
-    deviceIconDefault: "wifi",
-    deviceIconOn: "signal",
-    deviceIconOff: "flame",
-    correctPart: "resistor",
-    parts: ["resistor", "wire", "lamp", "battery", "capacitor"],
-  },
-  {
-    id: "issykkul",
-    pinIcon: "droplets",
-    color: "#3aa0d6",
-    top: "38%",
-    left: "70%",
-    panelIcon: "wind",
-    deviceIconDefault: "smartphone",
-    deviceIconOn: "smartphone",
-    deviceIconOff: "flame",
-    correctPart: "stabilizer",
-    parts: ["stabilizer", "resistor", "wire", "battery", "lamp"],
-  },
-  {
-    id: "osh",
-    pinIcon: "trees",
-    color: "#6bb84f",
-    top: "61.4%",
-    left: "34.2%",
-    panelIcon: "sun",
-    deviceIconDefault: "droplets",
-    deviceIconOn: "sprout",
-    deviceIconOff: "flame",
-    correctPart: "diode",
-    parts: ["diode", "resistor", "wire", "battery", "lamp"],
-  },
-];
-
-const KG_PATH =
-  "M 77.9 171.9 L 89.0 169.9 L 101.5 175.6 L 115.6 163.4 L 122.9 165.0 L 124.3 157.5 L 130.7 159.7 L 147.8 147.6 L 117.3 138.5 L 116.6 132.2 L 107.5 131.3 L 100.6 116.5 L 98.1 125.4 L 92.7 125.0 L 91.9 134.3 L 72.3 128.4 L 69.3 120.4 L 62.4 122.0 L 52.9 116.6 L 74.7 95.7 L 86.6 90.1 L 75.9 82.6 L 84.6 68.6 L 92.9 63.7 L 120.2 64.8 L 159.3 79.6 L 157.0 71.8 L 161.4 54.4 L 182.3 44.3 L 219.4 61.5 L 228.0 62.4 L 233.0 57.3 L 271.5 55.6 L 340.1 64.0 L 349.8 76.4 L 365.6 79.5 L 374.8 88.9 L 376.0 94.5 L 362.9 97.2 L 360.6 101.3 L 327.7 115.7 L 315.6 123.8 L 307.8 136.3 L 290.5 139.9 L 268.9 138.5 L 250.0 167.1 L 248.0 163.8 L 229.4 169.1 L 224.3 155.4 L 215.4 161.6 L 202.4 161.6 L 202.3 168.1 L 175.3 180.2 L 170.3 190.6 L 172.6 200.0 L 166.4 205.0 L 129.5 208.6 L 118.7 215.7 L 112.7 209.6 L 104.3 212.8 L 102.8 206.6 L 95.4 204.2 L 94.4 198.9 L 72.9 207.8 L 63.3 199.7 L 24.7 202.3 L 24.0 185.6 L 30.4 185.5 L 32.1 177.9 L 46.2 173.4 L 61.7 180.0 L 63.7 184.2 L 77.9 171.9 Z";
-
-const PART_ICONS = {
-  resistor: "activity",
-  wire: "cable",
-  lamp: "lightbulb",
-  battery: "battery",
-  capacitor: "layers",
-  stabilizer: "sliders_horizontal",
-  diode: "move_right",
-};
-
-const PLAYGROUND = {
-  naryn: {
-    uin: { min: 12, max: 30, step: 1, def: 24 },
-    r1: { min: 100, max: 3000, step: 100, def: 1000 },
-    r2: { min: 100, max: 3000, step: 100, def: 1000 },
-    safe: [10.8, 13.2],
-    range: [0, 30],
-  },
-  issykkul: {
-    uin: { min: 5, max: 24, step: 1, def: 14 },
-    drop: 9,
-    safe: [4.5, 5.5],
-    range: [0, 24],
-  },
-  osh: { r: { min: 2, max: 10, step: 1, def: 6 }, ubat: 12, upanel: 18, maxI: 6 },
-};
-
-function kgTrailPath() {
-  const order = ["osh", "naryn", "issykkul"];
-  const pts = order.map((id) => {
-    const m = MISSIONS.find((x) => x.id === id);
-    const x = parseFloat(m.left) * 4;
-    const y = parseFloat(m.top) * 2.6;
-    return `${x.toFixed(1)} ${y.toFixed(1)}`;
-  });
-  return `M ${pts.join(" L ")}`;
-}
-
-function loadProgress() {
-  try {
-    return JSON.parse(localStorage.getItem(STARS_KEY) || "{}") || {};
-  } catch {
-    return {};
-  }
-}
-
-function saveProgress(progress) {
-  try {
-    localStorage.setItem(STARS_KEY, JSON.stringify(progress));
-  } catch {
-    /* ignore */
-  }
-}
-
-function circuitStateFromPart(placedPart, correctPart) {
-  if (placedPart === correctPart) return 3;
-  if (!placedPart || placedPart === "wire") return 1;
-  return 2;
-}
-
-function localMentorFallback(lang, missionId, circuitState) {
-  const t = STR[lang].missions[missionId];
-  if (circuitState === 3) return t.successBody;
-  if (circuitState === 1) {
-    return (t.fails.wire || t.fails.empty).body + " " + STR[lang].common.tryAgain;
-  }
-  return t.fails[Object.keys(t.fails).find((k) => k !== "empty" && k !== "wire")]?.body || t.fails.empty.body;
-}
-
-function StarIcon({ filled, size = 14 }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ color: filled ? C.gold : "rgba(244,236,224,0.25)" }}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: ICONS.star }}
-    />
-  );
-}
-
-function StarRow({ n, size = 14 }) {
-  return (
-    <span className="inline-flex gap-0.5">
-      {[1, 2, 3].map((i) => (
-        <StarIcon key={i} filled={i <= n} size={size} />
-      ))}
-    </span>
-  );
-}
-
-function RangeBar({ min, max, value, safeMin, safeMax, ok }) {
-  const pct = (v) => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
-  return (
-    <div className="relative my-1 h-2.5 rounded-md bg-[rgba(244,236,224,0.14)]">
-      <div
-        className="absolute inset-y-0 rounded-md bg-[rgba(79,227,176,0.32)]"
-        style={{ left: `${pct(safeMin)}%`, width: `${pct(safeMax) - pct(safeMin)}%` }}
-      />
-      <div
-        className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_3px_#1c2c4e] transition-all ${
-          ok ? "bg-[#4fe3b0]" : "bg-[#ff6b4a]"
-        }`}
-        style={{ left: `${pct(value)}%` }}
-      />
-    </div>
-  );
-}
-
-function SliderRow({ label, valueLabel, min, max, step, value, onChange, accent }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between text-[12.5px]">
-        <span className="font-semibold text-[#a9b3c9]">{label}</span>
-        <span className="font-extrabold tabular-nums text-[#f3ecdf]">{valueLabel}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="lab-range w-full cursor-pointer"
-        style={{ "--thumb": accent || C.warm }}
-      />
-    </div>
-  );
-}
-
-function ModeBtn({ active, onClick, children, accent }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-[10px] border-[1.5px] px-2 py-2 text-[12.5px] font-bold transition ${
-        active
-          ? "border-transparent text-[#f3ecdf]"
-          : "border-[rgba(244,236,224,0.14)] bg-[#0f1a30] text-[#a9b3c9]"
-      }`}
-      style={
-        active
-          ? { borderColor: accent, background: `${accent}20` }
-          : undefined
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-function FormulaLab({ missionId, lang, accent }) {
-  const t = STR[lang].missions[missionId];
-  const cfg = PLAYGROUND[missionId];
-  const common = STR[lang].common;
-
-  const [uin, setUin] = useState(cfg.uin?.def ?? 14);
-  const [r1, setR1] = useState(cfg.r1?.def ?? 1000);
-  const [r2, setR2] = useState(cfg.r2?.def ?? 1000);
-  const [r, setR] = useState(cfg.r?.def ?? 6);
-  const [issyMode, setIssyMode] = useState("resistor");
-  const [day, setDay] = useState(true);
-  const [diode, setDiode] = useState(true);
-
-  useEffect(() => {
-    setUin(cfg.uin?.def ?? 14);
-    setR1(cfg.r1?.def ?? 1000);
-    setR2(cfg.r2?.def ?? 1000);
-    setR(cfg.r?.def ?? 6);
-    setIssyMode("resistor");
-    setDay(true);
-    setDiode(true);
-  }, [missionId, cfg]);
-
-  let result = null;
-  let formulaNode = null;
-
-  if (missionId === "naryn") {
-    const uout = (uin * r2) / (r1 + r2);
-    const ok = uout >= cfg.safe[0] && uout <= cfg.safe[1];
-    const statusText = ok ? t.okMsg : uout > cfg.safe[1] ? t.badHi : t.badLo;
-    formulaNode = t.formula;
-    result = (
-      <>
-        <div className="flex items-center gap-3 rounded-[14px] bg-[#0f1a30] px-3.5 py-3">
-          <span className="text-[26px] font-extrabold tabular-nums">{uout.toFixed(1)}</span>
-          <span className="text-[13px] font-semibold text-[#a9b3c9]">В</span>
-          <span
-            className={`ml-auto flex max-w-[150px] items-center gap-1.5 text-right text-xs font-bold ${
-              ok ? "text-[#4fe3b0]" : "text-[#ff6b4a]"
-            }`}
-          >
-            <Ico name={ok ? "circle_check_big" : "flame"} size={16} />
-            <span>{statusText}</span>
-          </span>
-        </div>
-        <RangeBar
-          min={cfg.range[0]}
-          max={cfg.range[1]}
-          value={uout}
-          safeMin={cfg.safe[0]}
-          safeMax={cfg.safe[1]}
-          ok={ok}
-        />
-      </>
-    );
-  } else if (missionId === "issykkul") {
-    const uout =
-      issyMode === "resistor"
-        ? Math.max(0, uin - cfg.drop)
-        : uin >= 5.5
-          ? 5
-          : Math.max(0, uin - 0.5);
-    const ok = uout >= cfg.safe[0] && uout <= cfg.safe[1];
-    const statusText = ok ? t.okMsg : uout > cfg.safe[1] ? t.badHi : t.badLo;
-    formulaNode = issyMode === "resistor" ? t.formulaResistor : t.formulaStabilizer;
-    result = (
-      <>
-        <div className="flex items-center gap-3 rounded-[14px] bg-[#0f1a30] px-3.5 py-3">
-          <span className="text-[26px] font-extrabold tabular-nums">{uout.toFixed(1)}</span>
-          <span className="text-[13px] font-semibold text-[#a9b3c9]">В</span>
-          <span
-            className={`ml-auto flex max-w-[150px] items-center gap-1.5 text-right text-xs font-bold ${
-              ok ? "text-[#4fe3b0]" : "text-[#ff6b4a]"
-            }`}
-          >
-            <Ico name={ok ? "circle_check_big" : "flame"} size={16} />
-            <span>{statusText}</span>
-          </span>
-        </div>
-        <RangeBar
-          min={cfg.range[0]}
-          max={cfg.range[1]}
-          value={uout}
-          safeMin={cfg.safe[0]}
-          safeMax={cfg.safe[1]}
-          ok={ok}
-        />
-      </>
-    );
-  } else if (missionId === "osh") {
-    let current;
-    let ok;
-    let statusText;
-    let dirIcon;
-    if (day) {
-      current = (cfg.upanel - cfg.ubat) / r;
-      ok = true;
-      statusText = t.okDayMsg;
-      formulaNode = t.formulaDayForward;
-      dirIcon = "move_right";
-    } else if (diode) {
-      current = 0;
-      ok = true;
-      statusText = t.okNightMsg;
-      formulaNode = t.formulaNightBlocked;
-      dirIcon = "circle_check_big";
-    } else {
-      current = cfg.ubat / r;
-      ok = false;
-      statusText = t.badMsg;
-      formulaNode = t.formulaNightNoDiode;
-      dirIcon = "arrow_left";
-    }
-    result = (
-      <>
-        <div className="flex items-center gap-3 rounded-[14px] bg-[#0f1a30] px-3.5 py-3">
-          <Ico name={dirIcon} size={20} className={ok ? "text-[#4fe3b0]" : "text-[#ff6b4a]"} />
-          <span className="text-[26px] font-extrabold tabular-nums">{current.toFixed(2)}</span>
-          <span className="text-[13px] font-semibold text-[#a9b3c9]">А</span>
-          <span
-            className={`ml-auto flex max-w-[150px] items-center gap-1.5 text-right text-xs font-bold ${
-              ok ? "text-[#4fe3b0]" : "text-[#ff6b4a]"
-            }`}
-          >
-            <Ico name={ok ? "circle_check_big" : "flame"} size={16} />
-            <span>{statusText}</span>
-          </span>
-        </div>
-        <RangeBar min={0} max={cfg.maxI} value={current} safeMin={0} safeMax={ok ? cfg.maxI : 0.01} ok={ok} />
-      </>
-    );
-  }
-
-  return (
-    <section className="flex flex-col gap-3.5 rounded-2xl border border-[rgba(244,236,224,0.1)] bg-[#1c2c4e] p-4 sm:p-5">
-      <div className="flex items-center gap-2">
-        <Ico name="sliders_horizontal" size={18} style={{ color: accent }} className="text-[var(--accent)]" />
-        <h3 className="m-0 text-sm font-extrabold" style={{ color: accent }}>
-          {t.labTitle}
-        </h3>
-      </div>
-
-      {missionId === "issykkul" && (
-        <div className="flex gap-2">
-          <ModeBtn active={issyMode === "resistor"} onClick={() => setIssyMode("resistor")} accent={accent}>
-            {t.modeResistor}
-          </ModeBtn>
-          <ModeBtn active={issyMode === "stabilizer"} onClick={() => setIssyMode("stabilizer")} accent={accent}>
-            {t.modeStabilizer}
-          </ModeBtn>
-        </div>
-      )}
-
-      {missionId === "osh" && (
-        <>
-          <div className="flex gap-2">
-            <ModeBtn active={day} onClick={() => setDay(true)} accent={accent}>
-              {t.dayBtn}
-            </ModeBtn>
-            <ModeBtn active={!day} onClick={() => setDay(false)} accent={accent}>
-              {t.nightBtn}
-            </ModeBtn>
-          </div>
-          <div className="flex gap-2">
-            <ModeBtn active={diode} onClick={() => setDiode(true)} accent={accent}>
-              {t.diodeOnBtn}
-            </ModeBtn>
-            <ModeBtn active={!diode} onClick={() => setDiode(false)} accent={accent}>
-              {t.diodeOffBtn}
-            </ModeBtn>
-          </div>
-        </>
-      )}
-
-      <div className="rounded-xl border border-[rgba(244,236,224,0.14)] bg-[#0f1a30] px-3.5 py-3 text-center text-[15px] font-bold tracking-wide text-[#f3ecdf]">
-        {formulaNode}
-      </div>
-
-      {missionId === "naryn" && (
-        <>
-          <SliderRow
-            label={t.lUin}
-            valueLabel={`${uin} В`}
-            min={cfg.uin.min}
-            max={cfg.uin.max}
-            step={cfg.uin.step}
-            value={uin}
-            onChange={setUin}
-            accent={accent}
-          />
-          <SliderRow
-            label={t.lR1}
-            valueLabel={`${r1} Ом`}
-            min={cfg.r1.min}
-            max={cfg.r1.max}
-            step={cfg.r1.step}
-            value={r1}
-            onChange={setR1}
-            accent={accent}
-          />
-          <SliderRow
-            label={t.lR2}
-            valueLabel={`${r2} Ом`}
-            min={cfg.r2.min}
-            max={cfg.r2.max}
-            step={cfg.r2.step}
-            value={r2}
-            onChange={setR2}
-            accent={accent}
-          />
-          <button
-            type="button"
-            className="flex items-center gap-1.5 self-start bg-transparent p-0 text-xs font-bold text-[#a9b3c9]"
-            onClick={() => {
-              setUin(cfg.uin.def);
-              setR1(cfg.r1.def);
-              setR2(cfg.r2.def);
-            }}
-          >
-            <Ico name="rotate_ccw" size={14} />
-            {common.labReset}
-          </button>
-        </>
-      )}
-
-      {missionId === "issykkul" && (
-        <>
-          <SliderRow
-            label={t.lUin}
-            valueLabel={`${uin} В`}
-            min={cfg.uin.min}
-            max={cfg.uin.max}
-            step={cfg.uin.step}
-            value={uin}
-            onChange={setUin}
-            accent={accent}
-          />
-          <button
-            type="button"
-            className="flex items-center gap-1.5 self-start bg-transparent p-0 text-xs font-bold text-[#a9b3c9]"
-            onClick={() => {
-              setUin(cfg.uin.def);
-              setIssyMode("resistor");
-            }}
-          >
-            <Ico name="rotate_ccw" size={14} />
-            {common.labReset}
-          </button>
-        </>
-      )}
-
-      {missionId === "osh" && (
-        <SliderRow
-          label={t.lR}
-          valueLabel={`${r} Ом`}
-          min={cfg.r.min}
-          max={cfg.r.max}
-          step={cfg.r.step}
-          value={r}
-          onChange={setR}
-          accent={accent}
-        />
-      )}
-
-      <div className="flex flex-col gap-2">{result}</div>
-    </section>
-  );
-}
-
-function SceneBanner({ id }) {
-  if (id === "naryn") {
-    return (
-      <svg viewBox="0 0 400 160" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          <linearGradient id="skyN" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#2a3f68" />
-            <stop offset="1" stopColor="#12203d" />
-          </linearGradient>
-        </defs>
-        <rect width="400" height="160" fill="url(#skyN)" />
-        <circle cx="330" cy="36" r="16" fill="#ffb3cf" opacity="0.9">
-          <animate attributeName="opacity" values="0.7;1;0.7" dur="3.5s" repeatCount="indefinite" />
-        </circle>
-        <path d="M0 120 L60 60 L110 100 L160 45 L220 110 L270 70 L330 120 L400 90 L400 160 L0 160 Z" fill="#1c2c4e" />
-        <path d="M120 100 L160 45 L200 100 Z" fill="#233a63" />
-        <g transform="translate(80,108)">
-          <ellipse cx="0" cy="18" rx="26" ry="16" fill="#ff7aa8" />
-          <path d="M-26 18 A26 16 0 0 1 26 18 Z" fill="#d97a49" />
-          <rect x="-3" y="-6" width="6" height="10" fill="#12203d" />
-        </g>
-      </svg>
-    );
-  }
-  if (id === "issykkul") {
-    return (
-      <svg viewBox="0 0 400 160" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          <linearGradient id="skyI" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#264a68" />
-            <stop offset="1" stopColor="#0f2438" />
-          </linearGradient>
-          <linearGradient id="lakeI" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#2f8fc2" />
-            <stop offset="1" stopColor="#12354a" />
-          </linearGradient>
-        </defs>
-        <rect width="400" height="160" fill="url(#skyI)" />
-        <path d="M0 90 L70 50 L130 85 L190 40 L250 90 L320 55 L400 85 L400 100 L0 100 Z" fill="#1c3350" opacity="0.9" />
-        <rect y="100" width="400" height="60" fill="url(#lakeI)" />
-        <g transform="translate(250,118)">
-          <path d="M-18 6 L18 6 L12 16 L-12 16 Z" fill="#f3ecdf" opacity="0.9" />
-          <line x1="0" y1="6" x2="0" y2="-16" stroke="#f3ecdf" strokeWidth="2" />
-          <path d="M0 -16 L14 -6 L0 -2 Z" fill="#ff7aa8" />
-        </g>
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 400 160" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <linearGradient id="skyO" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#33553f" />
-          <stop offset="1" stopColor="#12291f" />
-        </linearGradient>
-      </defs>
-      <rect width="400" height="160" fill="url(#skyO)" />
-      <circle cx="70" cy="34" r="14" fill="#e8c77a" opacity="0.9" />
-      <path d="M0 100 L400 100 L400 118 L0 128 Z" fill="#3f7a3f" />
-      <path d="M0 118 L400 108 L400 134 L0 145 Z" fill="#356a37" />
-      <path d="M0 138 L400 128 L400 160 L0 160 Z" fill="#2b562e" />
-      <g transform="translate(190,130)">
-        <path d="M-14 4 L14 4 L10 -10 L-10 -10 Z" fill="#ff7aa8" opacity="0.9" />
-        <rect x="-10" y="4" width="20" height="10" fill="#5a3a8c" />
-      </g>
-    </svg>
-  );
-}
-
-function useSfx(soundOn) {
+function useAudio(soundOn) {
   const ctxRef = useRef(null);
-  const ensure = useCallback(() => {
+
+  const getCtx = useCallback(() => {
     if (!ctxRef.current) {
       try {
-        ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioClass) ctxRef.current = new AudioClass();
       } catch {
         /* ignore */
       }
@@ -1045,842 +108,2422 @@ function useSfx(soundOn) {
   }, []);
 
   const playTone = useCallback(
-    (freq, start, duration, type, vol) => {
+    (freq, start, duration, type = "sine", vol = 0.12) => {
       if (!soundOn) return;
-      const ctx = ensure();
+      const ctx = getCtx();
       if (!ctx) return;
-      const t0 = ctx.currentTime + start;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type || "sine";
-      osc.frequency.setValueAtTime(freq, t0);
-      gain.gain.setValueAtTime(0, t0);
-      gain.gain.linearRampToValueAtTime(vol || 0.14, t0 + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(t0);
-      osc.stop(t0 + duration + 0.02);
+      try {
+        if (ctx.state === "suspended") ctx.resume();
+        const t0 = ctx.currentTime + start;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t0);
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + duration + 0.02);
+      } catch {
+        /* ignore */
+      }
     },
-    [soundOn, ensure]
+    [soundOn, getCtx]
   );
 
   return useMemo(
     () => ({
-      click: () => playTone(880, 0, 0.045, "square", 0.045),
+      click: () => playTone(880, 0, 0.04, "square", 0.04),
       nav: () => {
-        playTone(660, 0, 0.05, "sine", 0.06);
-        playTone(880, 0.05, 0.09, "sine", 0.06);
+        playTone(550, 0, 0.04, "sine", 0.06);
+        playTone(820, 0.04, 0.08, "sine", 0.06);
       },
       success: () => {
-        playTone(523.25, 0, 0.14, "sine");
-        playTone(659.25, 0.09, 0.14, "sine");
-        playTone(783.99, 0.18, 0.26, "sine");
+        playTone(523.25, 0, 0.12, "sine");
+        playTone(659.25, 0.08, 0.12, "sine");
+        playTone(783.99, 0.16, 0.24, "sine");
+        playTone(1046.5, 0.24, 0.35, "sine");
       },
       fail: () => {
-        playTone(196, 0, 0.16, "sawtooth", 0.1);
-        playTone(146.8, 0.11, 0.3, "sawtooth", 0.1);
+        playTone(220, 0, 0.14, "sawtooth", 0.08);
+        playTone(146.8, 0.1, 0.28, "sawtooth", 0.09);
+      },
+      sim: () => {
+        playTone(330, 0, 0.08, "triangle", 0.07);
+        playTone(660, 0.08, 0.12, "sine", 0.07);
       },
     }),
     [playTone]
   );
 }
 
-async function askMentorApi({ question, circuit_state, lang }) {
-  const res = await fetch(MENTOR_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, circuit_state, lang }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+// ============================================================================
+// BILINGUAL LOCALIZATION (RU / KY)
+// ============================================================================
+
+const STR = {
+  ru: {
+    nav: {
+      tagline: "Онлайн-лаборатория по физике",
+      questsTab: "9 класс: Квесты",
+      advancedTab: "10–11 класс: Лаборатории",
+      stars: "звёзд",
+    },
+    welcome: {
+      kicker: "FLUXLAB · СИЛА ФИЗИКИ В ДЕЙСТВИИ",
+      tagline: "SEE IT. TEST IT. GET IT.",
+      title: "Инженер внутри тебя",
+      desc: "Интерактивная физическая лаборатория нового поколения. Спасай инфраструктуру в регионах Кыргызстана и исследуй законы природы на продвинутых вычислительных симуляторах FastAPI.",
+      startBtn: "Начать эксперимент",
+      advBtn: "Продвинутые симуляции (10–11 класс)",
+      badges: [
+        { icon: "zap", title: "Электродинамика", desc: "Делители напряжения, стабилизаторы и вентильные диоды" },
+        { icon: "rocket", title: "Баллистика", desc: "Численное интегрирование движения тел с аэродинамикой" },
+        { icon: "waves", title: "Колебания и волны", desc: "Маятники, затухание и построение фазовых портретов" },
+        { icon: "thermometer", title: "Молекулярная физика", desc: "Изопроцессы идеального газа, работа и энергия ΔU" },
+      ],
+    },
+    map: {
+      title: "Инженерные миссии Кыргызстана",
+      subtitle: "Три региона — три реальные поломки. Собери цепь и восстанови работу техники.",
+      progress: (n) => `${n} из 3 миссий завершено`,
+      btnStart: "Перейти к верстаку",
+      done: "Пройдено",
+    },
+    missions: {
+      naryn: {
+        region: "Нарын",
+        location: "Жайлоо Сон-Куль",
+        title: "Защита интернет-роутера чабана",
+        desc: "Солнечная панель выдаёт 24 В, а роутеру для питания связи нужно ровно 12 В. При прямом подключении роутер сгорит от перенапряжения. Подбери деталь в цепь!",
+        sourceName: "Солнечная батарея",
+        sourceSpec: "24 В (пост. ток)",
+        deviceName: "Спутниковый роутер",
+        deviceSpec: "Требуется 12 В",
+        correctPart: "resistor",
+        successTitle: "Связь восстановлена!",
+        successBody: "Резисторный делитель снизил напряжение с 24 В до безопасных 12 В. Роутер запущен, чабан онлайн!",
+        fails: {
+          empty: { title: "Роутер сгорел!", body: "В цепи пусто — все 24 В ударили напрямую в электронику роутера." },
+          wire: { title: "Роутер сгорел!", body: "Провод обладает нулевым сопротивлением — напряжение не снизилось." },
+          lamp: { title: "Перегрузка!", body: "Лампочка горит, но её падения напряжения недостаточно для защиты роутера." },
+          battery: { title: "Взрыв цепи!", body: "Дополнительная батарея добавила лишние вольты — роутер мгновенно сгорел." },
+          capacitor: { title: "Роутер сгорел!", body: "Конденсатор накапливает заряд, но не обеспечивает постоянное деление напряжения." },
+        },
+        labTitle: "Формула делителя напряжения",
+        lUin: "Напряжение панели (Uin)",
+        lR1: "Резистор R1",
+        lR2: "Резистор R2",
+        lUout: "Напряжение на роутере (Uout)",
+        safeMsg: "Безопасно: 11.5 - 12.5 В",
+        highMsg: "Опасно высоко — сгорит!",
+        lowMsg: "Слишком мало — не включится",
+      },
+      issykkul: {
+        region: "Иссык-Куль",
+        location: "Юрточный лагерь",
+        title: "Стабилизация питания ветрогенератора",
+        desc: "На побережье туристы заряжают гаджеты от ветряка. Порывы ветра разгоняют генератор до 20 В, а зарядной станции строго нужно 5 В. Без стабилизации скачок напряжения спалит телефоны!",
+        sourceName: "Ветрогенератор",
+        sourceSpec: "Скачки до 20 В",
+        deviceName: "Зарядная станция",
+        deviceSpec: "Строго 5.0 В",
+        correctPart: "stabilizer",
+        successTitle: "Телефоны в безопасности!",
+        successBody: "Интегральный стабилизатор удерживает ровные 5 В даже при резких шквалах ветра до 20 В.",
+        fails: {
+          empty: { title: "Станция сгорела!", body: "Импульс 20 В уничтожил микросхемы контроллеров заряда." },
+          resistor: { title: "Скачок сжёг телефоны!", body: "Резистор гасит лишь фиксированную разницу — при порыве ветра напряжение пробило защиту." },
+          wire: { title: "Станция сгорела!", body: "Провод пропустил весь скачок без изменений." },
+          lamp: { title: "Станция сгорела!", body: "Лампа не стабилизирует вольтаж." },
+          battery: { title: "Двойная перегрузка!", body: "Батарея лишь усугубила бросок напряжения." },
+        },
+        labTitle: "Резистор против Стабилизатора",
+        lUin: "Напряжение генератора (Uin)",
+        modeResistor: "Обычный резистор",
+        modeStabilizer: "Стабилизатор 7805",
+        safeMsg: "Стабильные 5.0 В: зарядка идёт",
+        highMsg: "Скачок напряжения: телефоны сгорят!",
+        lowMsg: "Напряжение ниже 5 В: нет заряда",
+      },
+      osh: {
+        region: "Ош",
+        location: "Фермерская долина",
+        title: "Защита солнечной панели от обратного тока",
+        desc: "Насос полива питается от солнечной панели и аккумулятора 12 В. Ночью панель не генерирует ток, и заряженный аккумулятор начинает разряжаться обратно в панель, нагревая её. Нужен односторонний клапан для тока!",
+        sourceName: "Солнечная панель",
+        sourceSpec: "День: 18 В / Ночь: 0 В",
+        deviceName: "Поливочный насос",
+        deviceSpec: "Аккумулятор 12 В",
+        correctPart: "diode",
+        successTitle: "Панель спасена!",
+        successBody: "Диод пропускает ток заряда днём и намертво блокирует обратную утечку ночью.",
+        fails: {
+          empty: { title: "Панель повреждена!", body: "Ночью ток потёк обратно в панель, вызвав перегрев фотоэлементов." },
+          resistor: { title: "Обратный ток продолжается!", body: "Резистор симметричен — ток течёт в обе стороны одинаково." },
+          wire: { title: "Панель повреждена!", body: "Провод свободно пропустил обратный разряд аккумулятора." },
+          lamp: { title: "Панель перегрета!", body: "Лампа горит за счёт аккумулятора, разряжая его в панель." },
+          battery: { title: "Короткое замыкание!", body: "Два несогласованных источника повредили систему." },
+        },
+        labTitle: "Закон Ома и односторонняя проводимость",
+        dayBtn: "Дневной режим (18 В)",
+        nightBtn: "Ночной режим (0 В)",
+        diodeOn: "С диодом",
+        diodeOff: "Без диода",
+        lR: "Сопротивление нагрузки R",
+        lI: "Сила тока в цепи (I)",
+        safeDay: "Ток идёт на насос (+I)",
+        safeNight: "Диод блокирует обратный ток (I = 0)",
+        badNight: "Опасность! Ток течёт назад в панель (-I)",
+      },
+    },
+    workbench: {
+      backBtn: "К карте миссий",
+      warehouseTitle: "Склад радиодеталей — нажми для установки в слот",
+      sourceTitle: "Источник энергии",
+      slotTitle: "Монтажный слот",
+      consumerTitle: "Потребитель",
+      emptySlot: "Слот пуст",
+      testBtn: "Подать ток (Тест)",
+      resetBtn: "Сбросить цепь",
+      mentorTitle: "AI Ментор FluxLab",
+      mentorThinking: "Ментор анализирует схему...",
+      askMentorBtn: "Спросить совет ментора",
+      parts: {
+        resistor: "Резистор (1 кОм)",
+        wire: "Проводник",
+        lamp: "Лампа накаливания",
+        capacitor: "Конденсатор (100 мкФ)",
+        stabilizer: "Стабилизатор (5 В)",
+        diode: "Диод Шоттки",
+      },
+    },
+    advanced: {
+      title: "Продвинутая физическая лаборатория",
+      subtitle: "Математические симуляторы на базе FastAPI, Pydantic v2 и NumPy с экспортом отчетов.",
+      tabProjectile: "1. Баллистика и кинематика",
+      tabPendulum: "2. Маятники и волны",
+      tabGas: "3. Изопроцессы газа (МКТ)",
+      runBtn: "Запустить симуляцию",
+      calculating: "Вычисление модели...",
+      exportBtn: "📥 Скачать отчёт лаборатории (CSV)",
+      offlineBadge: "Автономный режим (локальный расчет)",
+      onlineBadge: "FastAPI Backend Online",
+      projectile: {
+        v0: "Начальная скорость v₀ (м/с)",
+        angle: "Угол к горизонту α (°)",
+        h0: "Начальная высота h₀ (м)",
+        drag: "Аэродинамическое сопротивление воздуха",
+        env: "Среда симуляции",
+        envEarth: "Земля (g=9.81, ρ=1.225)",
+        envMars: "Марс (g=3.71, ρ=0.020)",
+        envMoon: "Луна (g=1.62, вакуум)",
+        envWater: "Вода (g=9.81, ρ=1000)",
+        telemetry: {
+          range: "Дальность полёта L (м)",
+          height: "Макс. высота H (м)",
+          time: "Время полёта T (с)",
+          finalSpeed: "Конечная скорость v (м/с)",
+          energy: "Кинетическая энергия Eₖ (Дж)",
+        },
+      },
+      pendulum: {
+        type: "Тип колебательной системы",
+        typeSimple: "Математический маятник (нить)",
+        typeSpring: "Пружинный маятник (k)",
+        length: "Длина нити L (м)",
+        k: "Жесткость пружины k (Н/м)",
+        mass: "Масса груза m (кг)",
+        amp: "Начальная амплитуда x₀ (м)",
+        damping: "Коэффициент затухания β",
+        telemetry: {
+          period: "Период колебаний T (с)",
+          freq: "Частота ν (Гц)",
+          omega: "Циклическая частота ω₀ (рад/с)",
+          damping: "Режим колебаний",
+        },
+      },
+      gas: {
+        process: "Термодинамический изопроцесс",
+        pIsoT: "Изотермический (T = const)",
+        pIsoV: "Изохорный (V = const)",
+        pIsoP: "Изобарный (P = const)",
+        moles: "Количество вещества ν (моль)",
+        p0: "Начальное давление P₀ (кПа)",
+        v0: "Начальный объем V₀ (л)",
+        t0: "Начальная температура T₀ (К)",
+        target: "Конечный параметр (V₁ или T₁)",
+        telemetry: {
+          work: "Работа газа W (Дж)",
+          deltaU: "Изменение энергии ΔU (Дж)",
+          finalP: "Конечное давление P₁ (кПа)",
+          finalT: "Конечная температура T₁ (К)",
+        },
+      },
+    },
+  },
+  ky: {
+    nav: {
+      tagline: "Физика боюнча онлайн-лаборатория",
+      questsTab: "9-класс: Тапшырмалар",
+      advancedTab: "10–11-класс: Лабораториялар",
+      stars: "жылдыз",
+    },
+    welcome: {
+      kicker: "FLUXLAB · ФИЗИКАНЫН КҮЧҮ ИШ ҮСТҮНДӨ",
+      tagline: "SEE IT. TEST IT. GET IT.",
+      title: "Ичиңдеги инженер",
+      desc: "Жаңы муундагы интерактивдүү физика лабораториясы. Кыргызстандын аймактарындагы реалдуу инженердик бузулууларды чеч жана FastAPI эсептөө симуляторлорунда жаратылыш мыйзамдарын изилде.",
+      startBtn: "Экспериментти баштоо",
+      advBtn: "Өркүндөтүлгөн симуляциялар (10–11-класс)",
+      badges: [
+        { icon: "zap", title: "Электродинамика", desc: "Чыңалуу бөлгүчтөр, стабилизаторлор жана диоддор" },
+        { icon: "rocket", title: "Баллистика", desc: "Аэродинамика менен нерселердин кыймылын сандык эсептөө" },
+        { icon: "waves", title: "Термелүүлөр жана толкундар", desc: "Маятниктер, өчүү жана фазалык портреттер" },
+        { icon: "thermometer", title: "Молекулалык физика", desc: "Идеал газ изопроцесстери, жумуш жана ички энергия ΔU" },
+      ],
+    },
+    map: {
+      title: "Кыргызстандын инженердик миссиялары",
+      subtitle: "Үч аймак — үч реалдуу бузулуу. Схеманы жыйнап, техниканын ишин калыбына келтир.",
+      progress: (n) => `${n} / 3 тапшырма аткарылды`,
+      btnStart: "Верстакка өтүү",
+      done: "Аткарылды",
+    },
+    missions: {
+      naryn: {
+        region: "Нарын",
+        location: "Соң-Көл жайлоосу",
+        title: "Чабандын интернет-роутерин сактоо",
+        desc: "Күн батареясы 24 В берет, ал эми роутерге так 12 В керек. Түз туташтырсаң роутер күйүп кетет. Чынжырга ылайыктуу деталды кой!",
+        sourceName: "Күн батареясы",
+        sourceSpec: "24 В (туруктуу ток)",
+        deviceName: "Спутник роутери",
+        deviceSpec: "12 В керек",
+        correctPart: "resistor",
+        successTitle: "Байланыш калыбына келди!",
+        successBody: "Резистор чыңалууну 24 В дан керектүү 12 В га түшүрдү. Роутер иштеди, чабан байланышта!",
+        fails: {
+          empty: { title: "Роутер күйдү!", body: "Схемага эч нерсе коюлган жок — 24 В роутерге түз тийди." },
+          wire: { title: "Роутер күйдү!", body: "Зымдын каршылыгы жок — чыңалуу түшкөн жок." },
+          lamp: { title: "Ашыкча чыңалуу!", body: "Лампочка күйөт, бирок чыңалууну жетиштүү азайтпайт." },
+          battery: { title: "Жарылуу коркунучу!", body: "Кошумча батарея вольтту көбөйтүп, роутерди өрттөп салды." },
+          capacitor: { title: "Роутер күйдү!", body: "Конденсатор заряд топтойт, бирок чыңалууну туруктуу бөлбөйт." },
+        },
+        labTitle: "Чыңалуу бөлгүчтүн формуласы",
+        lUin: "Панелдин чыңалуусу (Uin)",
+        lR1: "Резистор R1",
+        lR2: "Резистор R2",
+        lUout: "Роутердеги чыңалуу (Uout)",
+        safeMsg: "Коопсуз: 11.5 - 12.5 В",
+        highMsg: "Өтө жогору — күйөт!",
+        lowMsg: "Өтө аз — иштебейт",
+      },
+      issykkul: {
+        region: "Ысык-Көл",
+        location: "Боз үй лагери",
+        title: "Шамал генераторунун чыңалуусун турукташтыруу",
+        desc: "Жээктеги туристтер телефондорун шамал генераторунан кубаттайт. Шамал күчөгөндө чыңалуу 20 В чейин секирет, ал эми станцияга так 5 В керек. Турукташтырбасаң секирик телефондорду күйгүзөт!",
+        sourceName: "Шамал генератору",
+        sourceSpec: "20 В чейин секирет",
+        deviceName: "Кубаттоо станциясы",
+        deviceSpec: "Так 5.0 В керек",
+        correctPart: "stabilizer",
+        successTitle: "Телефондор коопсуздукта!",
+        successBody: "Интегралдык стабилизатор 20 В чейинки катуу шамалда да так 5 В чыңалууну кармап турат.",
+        fails: {
+          empty: { title: "Станция күйдү!", body: "20 В секирик контроллер микросхемаларын өрттөп кетти." },
+          resistor: { title: "Телефондор күйдү!", body: "Резистор туруктуу гана төмөндөтөт — шамал күчөгөндө чыңалуу секиригин кармай алган жок." },
+          wire: { title: "Станция күйдү!", body: "Зым секирикти өзгөртүүсүз түз өткөрдү." },
+          lamp: { title: "Станция күйдү!", body: "Лампочка чыңалууну турукташтырбайт." },
+          battery: { title: "Кош ашыкча чыңалуу!", body: "Батарея чыңалуу секиригин ого бетер күчөттү." },
+        },
+        labTitle: "Резистор менен Стабилизатордун айырмасы",
+        lUin: "Генератордун чыңалуусу (Uin)",
+        modeResistor: "Жөнөкөй резистор",
+        modeStabilizer: "Стабилизатор 7805",
+        safeMsg: "Туруктуу 5.0 В: кубаттоо жүрүүдө",
+        highMsg: "Чыңалуу секирди: телефондор күйөт!",
+        lowMsg: "5 В дан төмөн: кубатталбайт",
+      },
+      osh: {
+        region: "Ош",
+        location: "Фермерлер өрөөнү",
+        title: "Күн панелин тескери токдон коргоо",
+        desc: "Сугаруучу насос күн панелинен жана 12 В аккумулятордон иштейт. Түнкүсүн күн жок болгондо заряддалган аккумулятор токту кайра панелге берип, аны ысытып күйгүзүшү мүмкүн. Бир жактуу клапан керек!",
+        sourceName: "Күн панели",
+        sourceSpec: "Күндүз: 18 В / Түндө: 0 В",
+        deviceName: "Сугаруу насосу",
+        deviceSpec: "Аккумулятор 12 В",
+        correctPart: "diode",
+        successTitle: "Панель корголду!",
+        successBody: "Диод күндүз кубаттоо тогун өткөрөт, ал эми түнкүсүн тескери агымды толугу менен бөгөйт.",
+        fails: {
+          empty: { title: "Панель бузулду!", body: "Түнкүсүн ток кайра панелге агып, фотоэлементтерди ысытты." },
+          resistor: { title: "Тескери ток токтогон жок!", body: "Резистор токту эки тарапка тең бирдей өткөрөт." },
+          wire: { title: "Панель бузулду!", body: "Зым тескери токту тоскоолдуксуз өткөрүп жиберди." },
+          lamp: { title: "Панель ысып кетти!", body: "Лампочка аккумулятордун эсебинен күйүп, аны түгөтөт." },
+          battery: { title: "Кыска туташуу!", body: "Эки булак бири-бирин бузуп салды." },
+        },
+        labTitle: "Ом мыйзамы жана бир жактуу өткөрүмдүүлүк",
+        dayBtn: "Күндүзгү режим (18 В)",
+        nightBtn: "Түнкү режим (0 В)",
+        diodeOn: "Диод менен",
+        diodeOff: "Диодсуз",
+        lR: "Жүктөмдүн каршылыгы R",
+        lI: "Чынжырдагы токтун күчү (I)",
+        safeDay: "Ток насоско барууда (+I)",
+        safeNight: "Диод тескери токту бөгөйт (I = 0)",
+        badNight: "Коркунуч! Ток кайра панелге агууда (-I)",
+      },
+    },
+    workbench: {
+      backBtn: "Тапшырмалар картасына",
+      warehouseTitle: "Буюмдар кампасы — слотко коюу үчүн бас",
+      sourceTitle: "Энергия булагы",
+      slotTitle: "Орнотуу слоту",
+      consumerTitle: "Прибор",
+      emptySlot: "Слот бош",
+      testBtn: "Токту бер (Сыноо)",
+      resetBtn: "Чынжырды тазалоо",
+      mentorTitle: "FluxLab AI Ментору",
+      mentorThinking: "Ментор схеманы талдоодо...",
+      askMentorBtn: "Ментордон кеңеш суроо",
+      parts: {
+        resistor: "Резистор (1 кОм)",
+        wire: "Өткөргүч зым",
+        lamp: "Ысытуу лампасы",
+        capacitor: "Конденсатор (100 мкФ)",
+        stabilizer: "Стабилизатор (5 В)",
+        diode: "Шоттки диоду",
+      },
+    },
+    advanced: {
+      title: "Өркүндөтүлгөн физика лабораториясы",
+      subtitle: "FastAPI, Pydantic v2 жана NumPy негизиндеги эсептөө симуляторлору жана отчетту экспорттоо.",
+      tabProjectile: "1. Баллистика жана кинематика",
+      tabPendulum: "2. Маятниктер жана толкундар",
+      tabGas: "3. Газ изопроцесстери (МКТ)",
+      runBtn: "Симуляцияны баштоо",
+      calculating: "Модель эсептелүүдө...",
+      exportBtn: "📥 Лабораториялык отчетту жүктөө (CSV)",
+      offlineBadge: "Автономдуу режим (жергиликтүү эсеп)",
+      onlineBadge: "FastAPI Backend Online",
+      projectile: {
+        v0: "Баштапкы ылдамдык v₀ (м/с)",
+        angle: "Горизонтко бурч α (°)",
+        h0: "Баштапкы бийиктик h₀ (м)",
+        drag: "Абанын аэродинамикалык каршылыгы",
+        env: "Симуляция чөйрөсү",
+        envEarth: "Жер (g=9.81, ρ=1.225)",
+        envMars: "Марс (g=3.71, ρ=0.020)",
+        envMoon: "Ай (g=1.62, вакуум)",
+        envWater: "Суу (g=9.81, ρ=1000)",
+        telemetry: {
+          range: "Учуу аралыгы L (м)",
+          height: "Макс. бийиктик H (м)",
+          time: "Учуу убактысы T (с)",
+          finalSpeed: "Акыркы ылдамдык v (м/с)",
+          energy: "Кинетикалык энергия Eₖ (Ж)",
+        },
+      },
+      pendulum: {
+        type: "Термелүү системасынын түрү",
+        typeSimple: "Математикалык маятник (жип)",
+        typeSpring: "Пружиналуу маятник (k)",
+        length: "Жиптин узундугу L (м)",
+        k: "Пружинанын катуулугу k (Н/м)",
+        mass: "Жүктүн салмагы m (кг)",
+        amp: "Баштапкы амплитуда x₀ (м)",
+        damping: "Өчүү коэффициенти β",
+        telemetry: {
+          period: "Термелүү мезгили T (с)",
+          freq: "Жыштыгы ν (Гц)",
+          omega: "Айланма жыштыгы ω₀ (рад/с)",
+          damping: "Термелүү режими",
+        },
+      },
+      gas: {
+        process: "Термодинамикалык изопроцесс",
+        pIsoT: "Изотермикалык (T = const)",
+        pIsoV: "Изохоралык (V = const)",
+        pIsoP: "Изобаралык (P = const)",
+        moles: "Заттын саны ν (моль)",
+        p0: "Баштапкы басым P₀ (кПа)",
+        v0: "Баштапкы көлөм V₀ (л)",
+        t0: "Баштапкы температура T₀ (К)",
+        target: "Акыркы параметр (V₁ же T₁)",
+        telemetry: {
+          work: "Газдын жумушу W (Ж)",
+          deltaU: "Ички энергиянын өзгөрүшү ΔU (Ж)",
+          finalP: "Акыркы басым P₁ (кПа)",
+          finalT: "Акыркы температура T₁ (К)",
+        },
+      },
+    },
+  },
+};
+
+const MISSIONS_LIST = [
+  { id: "naryn", key: "naryn", color: "#377DFF", icon: "wifi", grade: 9 },
+  { id: "issykkul", key: "issykkul", color: "#35D6FF", icon: "wind", grade: 9 },
+  { id: "osh", key: "osh", color: "#FFD84D", icon: "sun", grade: 9 },
+];
+
+// ============================================================================
+// API CLIENT WITH COMPLETE OFFLINE ENGINE FALLBACKS
+// ============================================================================
+
+async function fetchAskMentor({ question, circuit_state, lang }) {
+  try {
+    const res = await fetch(MENTOR_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, circuit_state, lang }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { answer: data.answer, source: data.source || "gemini" };
+    }
+  } catch {
+    /* Fallback */
+  }
+
+  // Fallback offline logic
+  const isKy = lang === "ky";
+  if (circuit_state === 3) {
+    return {
+      answer: isKy
+        ? "Азаматсың! Чынжыр эң сонун жыйналды. Бардык параметрлер коопсуз чекте жана прибор корголгон."
+        : "Отличная работа! Цепь замкнута идеально: напряжение и ток находятся в безопасных пределах, элемент выполняет свою защитную функцию.",
+      source: "expert_fallback",
+    };
+  }
+  return {
+    answer: isKy
+      ? "Көңүл бур! Схемага коргоочу же чыңалууну бөлүүчү деталды койбосоң прибор күйүп кетет. Ом мыйзамын эсиңе тут!"
+      : "Внимание: прибор перегружен или не защищён! Подбери компонент с нужным сопротивлением или вентильными свойствами.",
+    source: "expert_fallback",
+  };
 }
 
+async function fetchSimulateProjectile(params) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/labs/kinematics/projectile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) return await res.json();
+  } catch {
+    /* fallback to local math */
+  }
+
+  // Local client Euler simulation fallback
+  const { initial_velocity: v0, angle_deg, initial_height = 0, gravity = 9.807, air_resistance = false, dt = 0.02 } = params;
+  const rad = (angle_deg * Math.PI) / 180;
+  let vx = v0 * Math.cos(rad);
+  let vy = v0 * Math.sin(rad);
+  let x = 0;
+  let y = initial_height;
+  let t = 0;
+  const points = [];
+  let maxH = y;
+
+  while (y >= 0 && points.length < 1500) {
+    points.push({ t: Math.round(t * 100) / 100, x: Math.round(x * 100) / 100, y: Math.round(Math.max(0, y) * 100) / 100 });
+    maxH = Math.max(maxH, y);
+    const speed = Math.hypot(vx, vy);
+    const drag = air_resistance ? 0.002 * speed * speed : 0;
+    const ax = -drag * (vx / (speed || 1));
+    const ay = -gravity - drag * (vy / (speed || 1));
+    vx += ax * dt;
+    vy += ay * dt;
+    x += vx * dt;
+    y += vy * dt;
+    t += dt;
+  }
+
+  return {
+    points,
+    flight_time: Math.round(t * 100) / 100,
+    max_height: Math.round(maxH * 100) / 100,
+    max_range: Math.round(x * 100) / 100,
+    final_speed: Math.round(Math.hypot(vx, vy) * 100) / 100,
+    initial_kinetic_energy: Math.round(0.5 * 1.0 * v0 * v0 * 100) / 100,
+  };
+}
+
+async function fetchSimulatePendulum(params) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/labs/waves/pendulum`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) return await res.json();
+  } catch {
+    /* fallback */
+  }
+
+  const { pendulum_type = "simple", length = 1.0, spring_constant = 20.0, mass = 1.0, amplitude = 0.5, damping_coefficient = 0.2, gravity = 9.807, duration = 8.0, dt = 0.04 } = params;
+  const omega0 = pendulum_type === "simple" ? Math.sqrt(gravity / length) : Math.sqrt(spring_constant / mass);
+  const gamma = damping_coefficient / (2 * mass);
+  const omega_d = gamma < omega0 ? Math.sqrt(omega0 * omega0 - gamma * gamma) : 0;
+  const period = omega_d > 0 ? (2 * Math.PI) / omega_d : 0;
+
+  const points = [];
+  const steps = Math.floor(duration / dt);
+  let x = amplitude;
+  let v = 0;
+  let t = 0;
+
+  for (let i = 0; i <= steps; i++) {
+    points.push({ t: Math.round(t * 100) / 100, displacement: Math.round(x * 1000) / 1000, velocity: Math.round(v * 1000) / 1000 });
+    const a = -2 * gamma * v - omega0 * omega0 * x;
+    v += a * dt;
+    x += v * dt;
+    t += dt;
+  }
+
+  return {
+    period: Math.round(period * 100) / 100,
+    frequency: period > 0 ? Math.round((1 / period) * 100) / 100 : 0,
+    angular_frequency: Math.round(omega0 * 100) / 100,
+    displacement_graph: points,
+  };
+}
+
+async function fetchSimulateGasLaws(params) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/labs/particles/gas-laws`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) return await res.json();
+  } catch {
+    /* fallback */
+  }
+
+  const { process_type, moles = 1.0, initial_pressure = 101325, initial_volume = 0.024, initial_temperature = 293, target_value = 0.048 } = params;
+  const R = 8.314;
+  const steps = 25;
+  const points = [];
+  let totalW = 0;
+  let totalDU = 0;
+
+  if (process_type === "isothermal") {
+    const v1 = target_value;
+    for (let i = 0; i < steps; i++) {
+      const v = initial_volume + ((v1 - initial_volume) * i) / (steps - 1);
+      const p = (moles * R * initial_temperature) / v;
+      points.push({ volume: Math.round(v * 10000) / 10000, pressure: Math.round(p / 100) / 10, temperature: initial_temperature });
+    }
+    totalW = moles * R * initial_temperature * Math.log(v1 / initial_volume);
+    totalDU = 0;
+  } else if (process_type === "isochoric") {
+    const t1 = target_value;
+    for (let i = 0; i < steps; i++) {
+      const t = initial_temperature + ((t1 - initial_temperature) * i) / (steps - 1);
+      const p = (moles * R * t) / initial_volume;
+      points.push({ volume: Math.round(initial_volume * 10000) / 10000, pressure: Math.round(p / 100) / 10, temperature: Math.round(t) });
+    }
+    totalW = 0;
+    totalDU = moles * 1.5 * R * (t1 - initial_temperature);
+  } else {
+    const v1 = target_value;
+    for (let i = 0; i < steps; i++) {
+      const v = initial_volume + ((v1 - initial_volume) * i) / (steps - 1);
+      const t = (initial_pressure * v) / (moles * R);
+      points.push({ volume: Math.round(v * 10000) / 10000, pressure: Math.round(initial_pressure / 100) / 10, temperature: Math.round(t) });
+    }
+    totalW = initial_pressure * (v1 - initial_volume);
+    const finalT = (initial_pressure * v1) / (moles * R);
+    totalDU = moles * 1.5 * R * (finalT - initial_temperature);
+  }
+
+  return {
+    points,
+    total_work: Math.round(totalW * 10) / 10,
+    total_internal_energy_change: Math.round(totalDU * 10) / 10,
+    final_state: points[points.length - 1],
+  };
+}
+
+async function triggerReportExport(reportPayload) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/export/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...reportPayload, format: "csv" }),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `FluxLab_Report_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return true;
+    }
+  } catch {
+    /* fallback to client CSV */
+  }
+
+  // Client-side CSV generation
+  let csv = `Report: ${reportPayload.lab_title || "FluxLab Experiment"}\n`;
+  csv += `User: ${reportPayload.user_id}\nDate: ${new Date().toISOString()}\n\n`;
+  csv += "--- Parameters ---\n";
+  for (const [k, v] of Object.entries(reportPayload.input_parameters || {})) {
+    csv += `${k},${v}\n`;
+  }
+  csv += "\n--- Data Points ---\n";
+  if (reportPayload.table_points && reportPayload.table_points.length > 0) {
+    const headers = Object.keys(reportPayload.table_points[0]);
+    csv += headers.join(",") + "\n";
+    for (const pt of reportPayload.table_points) {
+      csv += headers.map((h) => pt[h] ?? "").join(",") + "\n";
+    }
+  }
+  csv += `\n--- Conclusions ---\n${reportPayload.conclusions || "Success"}\n`;
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `FluxLab_Report_${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return true;
+}
+
+// ============================================================================
+// MAIN APP COMPONENT
+// ============================================================================
+
 export default function App() {
-  const [screen, setScreen] = useState("welcome");
-  const [lang, setLang] = useState("ru");
-  const [missionId, setMissionId] = useState(null);
-  const [progress, setProgress] = useState(loadProgress);
+  const [lang, setLang] = useState(() => {
+    try {
+      return localStorage.getItem(LANG_KEY) || "ru";
+    } catch {
+      return "ru";
+    }
+  });
+
   const [soundOn, setSoundOn] = useState(() => {
     try {
-      const s = localStorage.getItem(SOUND_KEY);
-      return s === null ? true : s === "1";
+      return localStorage.getItem(SOUND_KEY) !== "0";
     } catch {
       return true;
     }
   });
 
+  const [stars, setStars] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STARS_KEY);
+      return saved ? JSON.parse(saved) : { naryn: 0, issykkul: 0, osh: 0 };
+    } catch {
+      return { naryn: 0, issykkul: 0, osh: 0 };
+    }
+  });
+
+  const [screen, setScreen] = useState("welcome"); // 'welcome' | 'map' | 'mission' | 'advanced'
+  const [activeMissionId, setActiveMissionId] = useState("naryn");
+  const [activeAdvTab, setActiveAdvTab] = useState("projectile"); // 'projectile' | 'pendulum' | 'gas'
+
+  // Workbench state
   const [selectedPart, setSelectedPart] = useState(null);
   const [placedPart, setPlacedPart] = useState(null);
-  const [attempts, setAttempts] = useState(0);
-  const [circuitVisual, setCircuitVisual] = useState("idle");
-  const [slotPulse, setSlotPulse] = useState(false);
-  const [wbFx, setWbFx] = useState("");
-  const [feedback, setFeedback] = useState(null);
-  const [particles, setParticles] = useState([]);
-  const [xpPop, setXpPop] = useState(null);
-
+  const [circuitVisual, setCircuitVisual] = useState("idle"); // 'idle' | 'success' | 'burnt'
+  const [mentorData, setMentorData] = useState(null);
   const [mentorLoading, setMentorLoading] = useState(false);
-  const [mentorBanner, setMentorBanner] = useState(null);
+  const [feedback, setFeedback] = useState(null);
 
-  const sfx = useSfx(soundOn);
-  const strings = STR[lang];
-  const total = useMemo(
-    () => Object.values(progress).reduce((a, b) => a + b, 0),
-    [progress]
-  );
-  const doneCount = useMemo(
-    () => Object.keys(progress).filter((id) => progress[id] > 0).length,
-    [progress]
-  );
-  const allDone = MISSIONS.every((m) => progress[m.id] > 0);
-  const mission = MISSIONS.find((m) => m.id === missionId);
-  const accent = mission?.color || C.warm;
+  // Advanced Labs State
+  const [projectileParams, setProjectileParams] = useState({
+    initial_velocity: 32,
+    angle_deg: 45,
+    initial_height: 0,
+    gravity: 9.807,
+    air_resistance: false,
+    drag_coefficient: 0.47,
+    cross_section_area: 0.05,
+    air_density: 1.225,
+  });
+  const [projectileResult, setProjectileResult] = useState(null);
 
-  const persistProgress = useCallback((next) => {
-    setProgress(next);
-    saveProgress(next);
-  }, []);
+  const [pendulumParams, setPendulumParams] = useState({
+    pendulum_type: "simple",
+    length: 1.5,
+    spring_constant: 25.0,
+    mass: 1.2,
+    amplitude: 0.4,
+    damping_coefficient: 0.15,
+    gravity: 9.807,
+  });
+  const [pendulumResult, setPendulumResult] = useState(null);
+
+  const [gasParams, setGasParams] = useState({
+    process_type: "isothermal",
+    moles: 1.0,
+    initial_pressure: 101325,
+    initial_volume: 0.024,
+    initial_temperature: 293.15,
+    target_value: 0.048,
+    steps: 25,
+  });
+  const [gasResult, setGasResult] = useState(null);
+  const [advLoading, setAdvLoading] = useState(false);
+
+  const sfx = useAudio(soundOn);
+  const t = STR[lang];
+
+  // Save state
+  const toggleLang = () => {
+    sfx.click();
+    const next = lang === "ru" ? "ky" : "ru";
+    setLang(next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const toggleSound = () => {
-    setSoundOn((v) => {
-      const n = !v;
-      try {
-        localStorage.setItem(SOUND_KEY, n ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return n;
-    });
+    const next = !soundOn;
+    setSoundOn(next);
+    try {
+      localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
   };
 
-  const resetMissionLocal = () => {
-    setSelectedPart(null);
-    setPlacedPart(null);
-    setAttempts(0);
-    setCircuitVisual("idle");
-    setFeedback(null);
-    setParticles([]);
-    setXpPop(null);
-    setWbFx("");
-    setMentorBanner(null);
-  };
+  const totalStars = Object.values(stars).reduce((a, b) => a + b, 0);
 
+  // Open Mission
   const openMission = (id) => {
     sfx.nav();
-    setMissionId(id);
-    resetMissionLocal();
+    setActiveMissionId(id);
+    setSelectedPart(null);
+    setPlacedPart(null);
+    setCircuitVisual("idle");
+    setFeedback(null);
+    setMentorData(null);
     setScreen("mission");
   };
 
-  const fetchMentor = useCallback(
-    async (circuit_state, questionOverride) => {
-      if (!missionId) return;
-      const question =
-        questionOverride || strings.missions[missionId].mentorQuestion;
-      setMentorLoading(true);
-      setMentorBanner(null);
-      try {
-        const data = await askMentorApi({
-          question,
-          circuit_state,
-          lang: lang === "ky" ? "ky" : "ru",
-        });
-        setMentorBanner({
-          answer: data.answer,
-          source: data.source || "api",
-          circuit_state: data.circuit_state ?? circuit_state,
-          fallback: false,
-        });
-      } catch {
-        setMentorBanner({
-          answer: localMentorFallback(lang, missionId, circuit_state),
-          source: "fallback",
-          circuit_state,
-          fallback: true,
-        });
-      } finally {
-        setMentorLoading(false);
-      }
-    },
-    [missionId, lang, strings]
-  );
+  // Test Circuit Handler
+  const handleTestCircuit = async () => {
+    sfx.sim();
+    const currentMission = t.missions[activeMissionId];
+    const isCorrect = placedPart === currentMission.correctPart;
 
-  const spawnParticles = (kind, count, attemptsNow) => {
-    const list = Array.from({ length: count }, (_, i) => {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 30 + Math.random() * 70;
-      return {
-        id: `${Date.now()}-${i}`,
-        kind,
-        dx: Math.cos(angle) * dist,
-        dy: Math.sin(angle) * dist - 20,
-      };
-    });
-    setParticles(list);
-    if (kind === "success") {
-      const xp = attemptsNow <= 1 ? 30 : attemptsNow === 2 ? 20 : 10;
-      setXpPop(`+${xp} XP`);
-      setTimeout(() => setXpPop(null), 1100);
-    }
-    setTimeout(() => setParticles([]), 1000);
-  };
-
-  const onTestCircuit = () => {
-    if (!mission) return;
-    setWbFx("");
-    const nextAttempts = attempts + 1;
-    setAttempts(nextAttempts);
-    const state = circuitStateFromPart(placedPart, mission.correctPart);
-    const t = strings.missions[missionId];
-
-    if (state === 3) {
+    if (isCorrect) {
       setCircuitVisual("success");
-      spawnParticles("success", 14, nextAttempts);
-      const starsEarned = nextAttempts <= 1 ? 3 : nextAttempts === 2 ? 2 : 1;
+      sfx.success();
+      const currentStar = stars[activeMissionId] || 0;
+      const nextStars = { ...stars, [activeMissionId]: Math.max(currentStar, 3) };
+      setStars(nextStars);
+      try {
+        localStorage.setItem(STARS_KEY, JSON.stringify(nextStars));
+      } catch {
+        /* ignore */
+      }
+
       setFeedback({
         kind: "success",
-        title: t.successTitle,
-        body: t.successBody,
-        stars: starsEarned,
-        tryAgain: false,
+        title: currentMission.successTitle,
+        body: currentMission.successBody,
       });
-      const next = {
-        ...progress,
-        [missionId]: Math.max(progress[missionId] || 0, starsEarned),
-      };
-      persistProgress(next);
-      sfx.success();
-      requestAnimationFrame(() => setWbFx("flash"));
-      fetchMentor(3);
-      return;
-    }
 
-    setCircuitVisual("burnt");
-    spawnParticles("fail", 12, nextAttempts);
-    const key = placedPart || "empty";
-    const fail = t.fails[key] || t.fails.empty;
-    setFeedback({
-      kind: "fail",
-      title: fail.title,
-      body: fail.body,
-      stars: 0,
-      tryAgain: true,
-    });
-    sfx.fail();
-    requestAnimationFrame(() => setWbFx("shake"));
-    fetchMentor(state);
+      // Ask mentor automatically
+      setMentorLoading(true);
+      const mentorResp = await fetchAskMentor({
+        question: currentMission.title,
+        circuit_state: 3,
+        lang,
+      });
+      setMentorData(mentorResp);
+      setMentorLoading(false);
+    } else {
+      setCircuitVisual("burnt");
+      sfx.fail();
+      const failInfo = currentMission.fails[placedPart || "empty"] || currentMission.fails.empty;
+      setFeedback({
+        kind: "fail",
+        title: failInfo.title,
+        body: failInfo.body,
+      });
+
+      setMentorLoading(true);
+      const mentorResp = await fetchAskMentor({
+        question: `${currentMission.title}: выбран ${placedPart || "пусто"}`,
+        circuit_state: 1,
+        lang,
+      });
+      setMentorData(mentorResp);
+      setMentorLoading(false);
+    }
   };
 
-  const onReset = () => {
+  const handleResetCircuit = () => {
     sfx.click();
     setSelectedPart(null);
     setPlacedPart(null);
     setCircuitVisual("idle");
     setFeedback(null);
-    setParticles([]);
-    setXpPop(null);
-    setWbFx("");
+    setMentorData(null);
   };
 
-  const onAskMentor = () => {
-    sfx.click();
-    const state = circuitStateFromPart(placedPart, mission?.correctPart);
-    fetchMentor(state);
+  // Run Advanced Sim
+  const runAdvancedSim = async (tab = activeAdvTab) => {
+    sfx.sim();
+    setAdvLoading(true);
+    if (tab === "projectile") {
+      const res = await fetchSimulateProjectile(projectileParams);
+      setProjectileResult(res);
+    } else if (tab === "pendulum") {
+      const res = await fetchSimulatePendulum(pendulumParams);
+      setPendulumResult(res);
+    } else if (tab === "gas") {
+      const res = await fetchSimulateGasLaws(gasParams);
+      setGasResult(res);
+    }
+    setAdvLoading(false);
   };
 
-  const deviceIcon =
-    circuitVisual === "success"
-      ? mission?.deviceIconOn
-      : circuitVisual === "burnt"
-        ? mission?.deviceIconOff
-        : mission?.deviceIconDefault;
+  // Run initial simulation for advanced lab
+  useEffect(() => {
+    if (screen === "advanced") {
+      if (activeAdvTab === "projectile" && !projectileResult) runAdvancedSim("projectile");
+      if (activeAdvTab === "pendulum" && !pendulumResult) runAdvancedSim("pendulum");
+      if (activeAdvTab === "gas" && !gasResult) runAdvancedSim("gas");
+    }
+  }, [screen, activeAdvTab]);
 
   return (
-    <div
-      className="min-h-screen w-full text-[#f3ecdf] antialiased"
-      style={{
-        background: C.deep,
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        ["--accent"]: accent,
-      }}
-    >
-      <style>{`
-        .lab-range{-webkit-appearance:none;appearance:none;height:26px;background:transparent;margin:0}
-        .lab-range::-webkit-slider-runnable-track{height:6px;border-radius:4px;background:rgba(244,236,224,0.14)}
-        .lab-range::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--thumb,#ff7aa8);border:3px solid #0f1a30;margin-top:-7px}
-        .lab-range::-moz-range-track{height:6px;border-radius:4px;background:rgba(244,236,224,0.14)}
-        .lab-range::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--thumb,#ff7aa8);border:3px solid #0f1a30}
-        @keyframes pinFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-        @keyframes pulseWire{0%,100%{opacity:.75}50%{opacity:1}}
-        @keyframes shakeSlot{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
-        @keyframes hardShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(5px)}45%{transform:translateX(-4px)}60%{transform:translateX(3px)}}
-        @keyframes flashGreen{0%{box-shadow:0 0 0 0 rgba(79,227,176,0)}30%{box-shadow:0 0 0 6px rgba(79,227,176,.18)}100%{box-shadow:0 0 0 0 rgba(79,227,176,0)}}
-        @keyframes xpFloat{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}20%{opacity:1;transform:translate(-50%,-6px) scale(1.05)}75%{opacity:1;transform:translate(-50%,-34px)}100%{opacity:0;transform:translate(-50%,-46px)}}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes trophyPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-        @keyframes mentorPulse{0%,100%{opacity:.55}50%{opacity:1}}
-        .pin-float{animation:pinFloat 3s ease-in-out infinite}
-        .wire-pulse{animation:pulseWire 1s ease-in-out infinite}
-        .slot-shake{animation:shakeSlot .4s ease}
-        .wb-shake{animation:hardShake .45s ease}
-        .wb-flash{animation:flashGreen .6s ease}
-        .xp-anim{animation:xpFloat 1.1s ease forwards}
-        .fade-enter{animation:fadeUp .3s ease}
-      `}</style>
-
-      <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col md:max-w-4xl">
-        {/* Topbar */}
-        <header className="flex items-center justify-between gap-2.5 px-4 pb-2.5 pt-4 sm:px-5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div
-              className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[#3a2166] shadow-[0_0_16px_rgba(255,122,168,0.45)]"
-              style={{
-                background:
-                  "radial-gradient(circle at 35% 30%, #ffb3cf, #ff7aa8 60%, #5a3a8c 100%)",
-              }}
-            >
-              <Ico name="zap" size={16} />
+    <div className="min-h-screen bg-[#081C36] text-[#F4F8FC] flex flex-col font-sans selection:bg-[#35D6FF]/30 selection:text-[#F4F8FC]">
+      {/* ==================================================================== */}
+      {/* TOPBAR / HEADER */}
+      {/* ==================================================================== */}
+      <header className="sticky top-0 z-50 bg-[#0D2547]/90 backdrop-blur-md border-b border-[#35D6FF]/20 px-4 sm:px-6 py-3 transition">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          {/* Logo & Brand */}
+          <button
+            onClick={() => {
+              sfx.nav();
+              setScreen("welcome");
+            }}
+            className="flex items-center gap-3 text-left focus:outline-none group"
+          >
+            <img src="/logo.svg" alt="FluxLab" className="h-9 w-auto mr-1 transition-transform group-hover:scale-105" />
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xl sm:text-2xl font-black tracking-wider bg-gradient-to-r from-[#F4F8FC] via-[#35D6FF] to-[#377DFF] bg-clip-text text-transparent">
+                  FluxLab
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#35D6FF]/15 text-[#35D6FF] border border-[#35D6FF]/30 hidden sm:inline-block">
+                  2.0
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-[#A1B5D8] hidden md:block">{t.nav.tagline}</p>
             </div>
-            <div className="min-w-0">
-              <h1 className="m-0 truncate text-[17px] font-extrabold tracking-tight">
-                {strings.common.appName}
-              </h1>
-            </div>
-          </div>
+          </button>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1.5 bg-[#081C36]/80 p-1 rounded-xl border border-[#35D6FF]/20">
             <button
-              type="button"
               onClick={() => {
-                toggleSound();
-                if (!soundOn) sfx.click();
+                sfx.click();
+                setScreen("map");
               }}
-              className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[rgba(244,236,224,0.14)] bg-[#1c2c4e] text-[#a9b3c9]"
-              aria-label="sound"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                screen === "map" || screen === "mission"
+                  ? "bg-[#377DFF] text-[#F4F8FC] shadow-lg shadow-[#377DFF]/30"
+                  : "text-[#A1B5D8] hover:text-[#F4F8FC]"
+              }`}
             >
-              <Ico name={soundOn ? "volume_2" : "volume_x"} size={16} />
+              <Ico name="zap" size={15} />
+              <span>{t.nav.questsTab}</span>
             </button>
-            <div className="flex h-8 items-center gap-1 rounded-[10px] border border-[rgba(244,236,224,0.14)] bg-[#1c2c4e] px-2.5 text-[12.5px] font-extrabold tabular-nums text-[#e8c77a]">
-              <StarIcon filled size={14} />
-              <span>
-                {total}/9
-              </span>
+            <button
+              onClick={() => {
+                sfx.click();
+                setScreen("advanced");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                screen === "advanced"
+                  ? "bg-[#377DFF] text-[#F4F8FC] shadow-lg shadow-[#377DFF]/30"
+                  : "text-[#A1B5D8] hover:text-[#F4F8FC]"
+              }`}
+            >
+              <Ico name="activity" size={15} />
+              <span>{t.nav.advancedTab}</span>
+            </button>
+          </div>
+
+          {/* Controls: Stars, Lang, Audio */}
+          <div className="flex items-center gap-2">
+            {/* Stars counter */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#081C36]/90 border border-[#FFD84D]/30 text-[#FFD84D] text-xs sm:text-sm font-extrabold shadow-inner">
+              <Ico name="star" size={16} style={{ color: "#FFD84D", fill: "#FFD84D" }} />
+              <span>{totalStars} / 9</span>
             </div>
-            <div className="flex overflow-hidden rounded-[10px] border border-[rgba(244,236,224,0.14)] bg-[#1c2c4e]">
-              {[
-                { id: "ru", label: "РУС" },
-                { id: "ky", label: "КЫР" },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => {
-                    sfx.click();
-                    setLang(opt.id);
-                  }}
-                  className={`px-2.5 py-1.5 text-[12.5px] font-bold transition sm:px-3 ${
-                    lang === opt.id
-                      ? "bg-[#ff7aa8] text-[#3a2166]"
-                      : "bg-transparent text-[#a9b3c9]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+
+            {/* Language toggle */}
+            <button
+              onClick={toggleLang}
+              className="px-2.5 py-1.5 rounded-xl bg-[#081C36] hover:bg-[#35D6FF]/10 border border-[#35D6FF]/30 text-xs font-bold text-[#F4F8FC] transition focus:outline-none"
+              title="Котормо / Перевод"
+            >
+              {lang === "ru" ? "🇷🇺 РУС" : "🇰🇬 КЫР"}
+            </button>
+
+            {/* Sound toggle */}
+            <button
+              onClick={toggleSound}
+              className="p-2 rounded-xl bg-[#081C36] hover:bg-[#35D6FF]/10 border border-[#35D6FF]/20 text-[#A1B5D8] hover:text-[#35D6FF] transition"
+              title="Звук"
+            >
+              <Ico name={soundOn ? "volume_2" : "volume_x"} size={17} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ==================================================================== */}
+      {/* SCREEN 1: WELCOME & HERO */}
+      {/* ==================================================================== */}
+      {screen === "welcome" && (
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col justify-center">
+          <div className="text-center max-w-3xl mx-auto">
+            {/* Logo Orbital Emblem */}
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 rounded-full bg-[#35D6FF]/20 blur-2xl animate-pulse" />
+              <img
+                src="/logo.svg"
+                alt="FluxLab"
+                className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto drop-shadow-[0_0_25px_rgba(53,214,255,0.4)]"
+              />
+            </div>
+
+            <p className="text-xs sm:text-sm font-black tracking-widest text-[#35D6FF] uppercase mb-2">
+              {t.welcome.kicker}
+            </p>
+
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-[#F4F8FC] mb-4">
+              <span className="bg-gradient-to-r from-[#F4F8FC] via-[#35D6FF] to-[#377DFF] bg-clip-text text-transparent">
+                {t.welcome.tagline}
+              </span>
+            </h1>
+
+            <p className="text-base sm:text-lg text-[#A1B5D8] leading-relaxed mb-8 max-w-2xl mx-auto">
+              {t.welcome.desc}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 mb-16">
+              <button
+                onClick={() => {
+                  sfx.nav();
+                  setScreen("map");
+                }}
+                className="flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-[#377DFF] to-[#35D6FF] text-[#081C36] font-extrabold text-base shadow-xl shadow-[#377DFF]/40 hover:scale-105 active:scale-95 transition"
+              >
+                <Ico name="zap" size={20} />
+                <span>{t.welcome.startBtn}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  sfx.nav();
+                  setScreen("advanced");
+                }}
+                className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#0D2547] hover:bg-[#35D6FF]/10 text-[#F4F8FC] border border-[#35D6FF]/30 font-bold text-base transition"
+              >
+                <Ico name="activity" size={20} className="text-[#35D6FF]" />
+                <span>{t.welcome.advBtn}</span>
+              </button>
             </div>
           </div>
-        </header>
 
-        <main className="flex flex-1 flex-col gap-4 px-4 pb-10 pt-1.5 sm:px-5">
-          {/* WELCOME */}
-          {screen === "welcome" && (
-            <div className="fade-enter flex flex-1 flex-col items-center justify-center gap-[18px] px-1 pb-2 pt-6 text-center">
-              <div className="h-24 w-24">
-                <svg viewBox="0 0 100 100" className="h-full w-full">
-                  <circle cx="50" cy="50" r="46" fill="none" stroke="#ff7aa8" strokeWidth="2" opacity="0.5" />
-                  <circle cx="50" cy="50" r="8" fill="#ff7aa8" />
-                  <g stroke="#ffb3cf" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="50" y1="50" x2="50" y2="10" />
-                    <line x1="50" y1="50" x2="50" y2="90" />
-                    <line x1="50" y1="50" x2="10" y2="50" />
-                    <line x1="50" y1="50" x2="90" y2="50" />
-                    <line x1="50" y1="50" x2="21" y2="21" />
-                    <line x1="50" y1="50" x2="79" y2="79" />
-                    <line x1="50" y1="50" x2="21" y2="79" />
-                    <line x1="50" y1="50" x2="79" y2="21" />
-                  </g>
-                </svg>
-              </div>
-              <div className="text-[12.5px] font-bold tracking-[0.06em] text-[#ff7aa8]">
-                {strings.welcome.kicker}
-              </div>
-              <h2 className="m-0 text-[27px] font-extrabold leading-tight tracking-tight">
-                {strings.welcome.title}
-              </h2>
-              <p className="m-0 max-w-sm text-[15px] leading-relaxed text-[#a9b3c9]">
-                {strings.welcome.subtitle}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  sfx.nav();
-                  setScreen("map");
-                }}
-                className="mt-2 flex w-full max-w-[280px] items-center justify-center gap-2 rounded-[14px] bg-[#ff7aa8] px-5 py-[15px] text-[15.5px] font-extrabold text-[#3a2166] transition active:scale-[0.97]"
+          {/* 4 Feature Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {t.welcome.badges.map((b, idx) => (
+              <div
+                key={idx}
+                className="p-5 rounded-2xl bg-[#0D2547]/80 border border-[#35D6FF]/20 backdrop-blur-sm hover:border-[#35D6FF]/40 transition group"
               >
-                <Ico name="zap" size={18} />
-                <span>{strings.welcome.startBtn}</span>
-              </button>
-              <footer className="text-[11.5px] text-[#a9b3c9] opacity-70">
-                {strings.common.footer}
-              </footer>
-            </div>
-          )}
+                <div className="w-10 h-10 rounded-xl bg-[#377DFF]/15 border border-[#377DFF]/30 text-[#35D6FF] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <Ico name={b.icon} size={22} />
+                </div>
+                <h3 className="font-bold text-[#F4F8FC] text-base mb-1">{b.title}</h3>
+                <p className="text-xs text-[#A1B5D8] leading-relaxed">{b.desc}</p>
+              </div>
+            ))}
+          </div>
+        </main>
+      )}
 
-          {/* MAP */}
-          {screen === "map" && (
-            <div className="fade-enter flex flex-col gap-4">
+      {/* ==================================================================== */}
+      {/* SCREEN 2: REGIONAL QUEST MAP (9th GRADE PHYSICS) */}
+      {/* ==================================================================== */}
+      {screen === "map" && (
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+            <div>
+              <div className="flex items-center gap-2 text-[#35D6FF] text-xs font-bold uppercase tracking-wider mb-1">
+                <Ico name="zap" size={16} />
+                <span>9-класс · Практикалык схемотехника</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-[#F4F8FC]">{t.map.title}</h2>
+              <p className="text-sm text-[#A1B5D8]">{t.map.subtitle}</p>
+            </div>
+
+            <div className="px-4 py-2.5 rounded-2xl bg-[#0D2547] border border-[#35D6FF]/20 flex items-center gap-3">
+              <Ico name="trophy" size={20} className="text-[#FFD84D]" />
               <div>
-                <h2 className="m-0 text-[21px] font-extrabold">{strings.map.title}</h2>
-                <p className="mt-1 text-[13.5px] text-[#a9b3c9]">{strings.map.subtitle}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex gap-1.5">
-                    {[0, 1, 2].map((i) => (
-                      <span
-                        key={i}
-                        className={`h-[7px] w-[7px] rounded-full ${
-                          i < doneCount ? "bg-[#4fe3b0]" : "bg-[rgba(244,236,224,0.14)]"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs text-[#a9b3c9]">
-                    {strings.map.progress(doneCount)}
-                  </span>
+                <p className="text-xs font-medium text-[#A1B5D8]">{t.map.progress(Object.values(stars).filter((v) => v > 0).length)}</p>
+                <div className="w-32 bg-[#081C36] h-1.5 rounded-full overflow-hidden mt-1 border border-[#35D6FF]/20">
+                  <div
+                    className="bg-gradient-to-r from-[#377DFF] to-[#35D6FF] h-full transition-all"
+                    style={{
+                      width: `${(Object.values(stars).filter((v) => v > 0).length / 3) * 100}%`,
+                    }}
+                  />
                 </div>
               </div>
+            </div>
+          </div>
 
-              {allDone && (
-                <div className="flex items-center gap-3 rounded-2xl border border-[rgba(232,199,122,0.4)] bg-gradient-to-br from-[rgba(232,199,122,0.18)] to-[rgba(201,96,58,0.12)] px-4 py-3.5">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgba(232,199,122,0.2)] text-[#e8c77a]"
-                    style={{ animation: "trophyPulse 2.4s ease-in-out infinite" }}
-                  >
-                    <Ico name="trophy" size={20} />
-                  </div>
-                  <div>
-                    <b className="block text-sm text-[#f3ecdf]">{strings.map.trophyTitle}</b>
-                    <div className="mt-0.5 text-[12.5px] text-[#a9b3c9]">
-                      {strings.map.trophySub(total, 9)}
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* 3 Regional Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {MISSIONS_LIST.map((m) => {
+              const data = t.missions[m.key];
+              const starCount = stars[m.key] || 0;
+              const isCompleted = starCount > 0;
 
-              <div className="relative aspect-[400/260] w-full overflow-hidden rounded-[20px] border border-[rgba(244,236,224,0.14)] bg-gradient-to-b from-[#182642] to-[#101b34]">
-                <svg
-                  className="absolute inset-0 h-full w-full"
-                  viewBox="0 0 400 260"
-                  preserveAspectRatio="xMidYMid meet"
+              return (
+                <div
+                  key={m.id}
+                  className="rounded-3xl bg-[#0D2547] border border-[#35D6FF]/25 overflow-hidden flex flex-col justify-between hover:border-[#35D6FF]/60 hover:shadow-2xl hover:shadow-[#081C36] transition group"
                 >
-                  <defs>
-                    <linearGradient id="mapsky" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stopColor="#182642" />
-                      <stop offset="1" stopColor="#0f1b30" />
-                    </linearGradient>
-                    <radialGradient id="kgfill" cx="35%" cy="30%" r="90%">
-                      <stop offset="0" stopColor="#2a3f68" />
-                      <stop offset="1" stopColor="#1c2c4e" />
-                    </radialGradient>
-                    <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
-                      <path d="M26 0H0V26" fill="none" stroke="rgba(244,236,224,0.05)" />
-                    </pattern>
-                  </defs>
-                  <rect width="400" height="260" fill="url(#mapsky)" />
-                  <rect width="400" height="260" fill="url(#grid)" />
-                  <path
-                    d={KG_PATH}
-                    fill="url(#kgfill)"
-                    stroke="rgba(244,236,224,0.4)"
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d={kgTrailPath()}
-                    fill="none"
-                    stroke="rgba(244,236,224,0.35)"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 7"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                  {/* Card Visual Header */}
+                  <div className="relative h-44 bg-gradient-to-br from-[#081C36] to-[#0D2547] p-5 flex flex-col justify-between overflow-hidden">
+                    <div className="absolute -right-6 -bottom-6 w-36 h-36 rounded-full bg-[#35D6FF]/10 blur-xl group-hover:scale-150 transition-transform" />
 
-                {MISSIONS.map((m, idx) => {
-                  const stars = progress[m.id] || 0;
-                  const done = stars > 0;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => openMission(m.id)}
-                      className="absolute flex -translate-x-1/2 -translate-y-full flex-col items-center gap-1 bg-transparent p-0"
-                      style={{ top: m.top, left: m.left }}
-                    >
-                      <div
-                        className={`pin-float relative flex h-[46px] w-[46px] items-center justify-center rounded-full border-2 bg-[#1c2c4e] ${
-                          done ? "text-[#0f1a30]" : ""
-                        }`}
-                        style={{
-                          borderColor: m.color,
-                          color: done ? "#0f1a30" : m.color,
-                          background: done ? m.color : C.panel,
-                          animationDelay: `${idx * 0.4}s`,
-                        }}
-                      >
-                        <Ico name={m.pinIcon} size={20} />
-                        {done && (
-                          <div className="absolute -right-1 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 border-[#0f1a30] bg-[#4fe3b0] text-[#0f1a30]">
-                            <Ico name="check" size={11} />
-                          </div>
-                        )}
-                      </div>
-                      <span className="whitespace-nowrap rounded-lg bg-[rgba(15,26,48,0.85)] px-2 py-0.5 text-[11.5px] font-bold">
-                        {strings.missions[m.id].pinLabel}
+                    <div className="flex items-center justify-between relative z-10">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#081C36]/80 text-[#35D6FF] border border-[#35D6FF]/30 backdrop-blur-sm">
+                        {data.location}
                       </span>
-                      {done && (
-                        <span className="inline-flex rounded-md bg-[rgba(15,26,48,0.85)] px-1.5 py-0.5">
-                          <StarRow n={stars} size={10} />
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <footer className="text-center text-[11px] text-[#a9b3c9] opacity-65">
-                {strings.common.footer}
-              </footer>
-            </div>
-          )}
-
-          {/* MISSION */}
-          {screen === "mission" && mission && (
-            <div className="fade-enter flex flex-col gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  sfx.nav();
-                  setScreen("map");
-                }}
-                className="flex items-center gap-1.5 self-start bg-transparent p-1 text-[13px] font-bold text-[#a9b3c9]"
-              >
-                <Ico name="arrow_left" size={16} />
-                {strings.common.backBtn}
-              </button>
-
-              <div className="relative h-40 overflow-hidden rounded-[18px] border border-[rgba(244,236,224,0.14)] md:h-48">
-                <SceneBanner id={missionId} />
-              </div>
-
-              <div>
-                <div className="text-[11.5px] font-bold tracking-wide" style={{ color: accent }}>
-                  {strings.missions[missionId].missionLabel}
-                </div>
-                <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#f3ecdf]">
-                  {strings.missions[missionId].missionText}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
-                {/* Workbench column */}
-                <div className="flex flex-col gap-4">
-                  <div
-                    className={`relative rounded-[18px] border border-[rgba(244,236,224,0.14)] bg-[#1c2c4e] px-3.5 pb-[22px] pt-5 sm:px-4 ${
-                      wbFx === "shake" ? "wb-shake" : wbFx === "flash" ? "wb-flash" : ""
-                    }`}
-                  >
-                    <div className="mb-3.5 flex items-center justify-between">
-                      <p className="m-0 text-[13px] font-semibold text-[#a9b3c9]">
-                        {strings.common.workbenchTitle}
-                      </p>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(244,236,224,0.14)] bg-[#0f1a30] px-2.5 py-1 text-[11.5px] font-bold text-[#a9b3c9]">
-                        {progress[missionId] ? (
-                          <StarRow n={progress[missionId]} size={12} />
-                        ) : (
-                          `${strings.common.attemptLabel} ${attempts}`
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="relative flex items-center gap-0">
-                      <div className="flex w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-[14px] border-[1.5px] border-[rgba(244,236,224,0.14)] bg-[#0f1a30] px-1 py-2.5 text-center text-[11px] font-bold sm:w-[86px]">
-                        <Ico name={mission.panelIcon} size={22} className="text-[#a9b3c9]" />
-                        <span>{strings.missions[missionId].panelLabel}</span>
-                        <span className="text-[10.5px] font-semibold text-[#a9b3c9]">
-                          {strings.missions[missionId].panelVolt}
-                        </span>
-                      </div>
-
-                      <div
-                        className={`h-1 min-w-[10px] flex-1 rounded-sm ${
-                          circuitVisual === "success"
-                            ? "wire-pulse bg-[#4fe3b0] shadow-[0_0_10px_1px_#4fe3b0]"
-                            : circuitVisual === "burnt"
-                              ? "bg-[#ff6b4a] shadow-[0_0_10px_1px_#ff6b4a]"
-                              : "bg-[rgba(244,236,224,0.14)]"
-                        }`}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCircuitVisual("idle");
-                          setFeedback(null);
-                          if (placedPart) {
-                            sfx.click();
-                            setPlacedPart(null);
-                            return;
-                          }
-                          if (selectedPart) {
-                            sfx.click();
-                            setPlacedPart(selectedPart);
-                            setSelectedPart(null);
-                          } else {
-                            setSlotPulse(true);
-                            setTimeout(() => setSlotPulse(false), 400);
-                          }
-                        }}
-                        className={`flex h-[74px] w-[74px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[14px] border-2 text-[10.5px] font-semibold transition ${
-                          placedPart
-                            ? "border-solid text-[#f3ecdf]"
-                            : "border-dashed border-[rgba(244,236,224,0.14)] bg-[rgba(255,255,255,0.02)] text-[#a9b3c9]"
-                        } ${slotPulse ? "slot-shake" : ""}`}
-                        style={
-                          placedPart
-                            ? {
-                                borderColor: accent,
-                                background: `${accent}24`,
-                              }
-                            : undefined
-                        }
-                      >
-                        <Ico
-                          name={placedPart ? PART_ICONS[placedPart] : "layers"}
-                          size={placedPart ? 20 : 18}
-                        />
-                        <span>
-                          {placedPart
-                            ? strings.common[`part_${placedPart}`]
-                            : strings.common.slotEmpty}
-                        </span>
-                      </button>
-
-                      <div
-                        className={`h-1 min-w-[10px] flex-1 rounded-sm ${
-                          circuitVisual === "success"
-                            ? "wire-pulse bg-[#4fe3b0] shadow-[0_0_10px_1px_#4fe3b0]"
-                            : circuitVisual === "burnt"
-                              ? "bg-[#ff6b4a] shadow-[0_0_10px_1px_#ff6b4a]"
-                              : "bg-[rgba(244,236,224,0.14)]"
-                        }`}
-                      />
-
-                      <div
-                        className={`flex w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-[14px] border-[1.5px] bg-[#0f1a30] px-1 py-2.5 text-center text-[11px] font-bold transition sm:w-[86px] ${
-                          circuitVisual === "success"
-                            ? "border-[#4fe3b0] shadow-[0_0_18px_2px_rgba(79,227,176,0.45)]"
-                            : circuitVisual === "burnt"
-                              ? "border-[#ff6b4a] shadow-[0_0_18px_2px_rgba(255,107,74,0.4)]"
-                              : "border-[rgba(244,236,224,0.14)]"
-                        }`}
-                      >
-                        <Ico
-                          name={deviceIcon}
-                          size={22}
-                          className={
-                            circuitVisual === "success"
-                              ? "text-[#4fe3b0]"
-                              : circuitVisual === "burnt"
-                                ? "text-[#ff6b4a]"
-                                : "text-[#a9b3c9]"
-                          }
-                        />
-                        <span>{strings.missions[missionId].deviceLabel}</span>
-                        <span className="text-[10.5px] font-semibold text-[#a9b3c9]">
-                          {strings.missions[missionId].deviceVolt}
-                        </span>
-                      </div>
-
-                      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[18px]">
-                        {particles.map((p) => (
-                          <span
-                            key={p.id}
-                            className={`absolute left-1/2 top-[46%] h-1.5 w-1.5 rounded-full ${
-                              p.kind === "success" ? "bg-[#4fe3b0]" : "bg-[#ff6b4a]"
-                            }`}
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map((s) => (
+                          <Ico
+                            key={s}
+                            name="star"
+                            size={16}
                             style={{
-                              transform: "translate(-50%,-50%)",
-                              animation: "none",
-                              transition: "transform .9s cubic-bezier(.2,.7,.3,1), opacity .9s ease-out",
-                              opacity: 1,
-                              ["--dx"]: `${p.dx}px`,
-                              ["--dy"]: `${p.dy}px`,
-                            }}
-                            ref={(el) => {
-                              if (el) {
-                                requestAnimationFrame(() => {
-                                  el.style.transform = `translate(calc(-50% + ${p.dx}px), calc(-50% + ${p.dy}px))`;
-                                  setTimeout(() => {
-                                    el.style.opacity = "0";
-                                  }, 550);
-                                });
-                              }
+                              color: s <= starCount ? "#FFD84D" : "rgba(161, 181, 216, 0.2)",
+                              fill: s <= starCount ? "#FFD84D" : "none",
                             }}
                           />
                         ))}
-                        {xpPop && (
-                          <div className="xp-anim absolute left-1/2 top-0 -translate-x-1/2 text-[15px] font-extrabold text-[#e8c77a]">
-                            {xpPop}
-                          </div>
-                        )}
                       </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <h3 className="mb-2.5 ml-0.5 text-[13px] font-semibold text-[#a9b3c9]">
-                      {strings.common.warehouseTitle}
-                    </h3>
-                    <div className="flex gap-2.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {mission.parts.map((pid) => {
-                        const sel = selectedPart === pid;
-                        return (
-                          <button
-                            key={pid}
-                            type="button"
-                            onClick={() => {
-                              sfx.click();
-                              setSelectedPart((cur) => (cur === pid ? null : pid));
-                            }}
-                            className={`flex w-[78px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[14px] border-[1.5px] bg-[#1c2c4e] px-1.5 py-3 text-[10.5px] font-semibold transition active:scale-95 ${
-                              sel
-                                ? "border-[#4fe3b0] text-[#f3ecdf] shadow-[inset_0_0_0_1px_#4fe3b0]"
-                                : "border-[rgba(244,236,224,0.14)] text-[#a9b3c9]"
-                            }`}
-                          >
-                            <Ico
-                              name={PART_ICONS[pid]}
-                              size={22}
-                              className={sel ? "text-[#4fe3b0]" : "text-[#a9b3c9]"}
-                            />
-                            <span>{strings.common[`part_${pid}`]}</span>
-                          </button>
-                        );
-                      })}
+                    <div className="relative z-10">
+                      <h3 className="text-2xl font-black text-[#F4F8FC] mb-0.5">{data.region}</h3>
+                      <p className="text-xs font-semibold text-[#FFD84D]">{data.deviceName}</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2.5">
+                  {/* Card Body */}
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm text-[#F4F8FC] mb-2">{data.title}</h4>
+                      <p className="text-xs text-[#A1B5D8] leading-relaxed mb-4">{data.desc}</p>
+
+                      <div className="space-y-1.5 mb-5 text-[11px]">
+                        <div className="flex justify-between p-2 rounded-xl bg-[#081C36]/60 border border-[#35D6FF]/10">
+                          <span className="text-[#A1B5D8]">{data.sourceName}:</span>
+                          <span className="font-bold text-[#FF5353]">{data.sourceSpec}</span>
+                        </div>
+                        <div className="flex justify-between p-2 rounded-xl bg-[#081C36]/60 border border-[#35D6FF]/10">
+                          <span className="text-[#A1B5D8]">{data.deviceName}:</span>
+                          <span className="font-bold text-[#35D6FF]">{data.deviceSpec}</span>
+                        </div>
+                      </div>
+                    </div>
+
                     <button
-                      type="button"
-                      onClick={onTestCircuit}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3.5 py-3 text-sm font-extrabold text-[#3a2166] transition active:scale-[0.97]"
-                      style={{ background: accent }}
+                      onClick={() => openMission(m.key)}
+                      className="w-full py-3 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 bg-[#377DFF] hover:bg-[#35D6FF] hover:text-[#081C36] text-[#F4F8FC] shadow-lg shadow-[#377DFF]/25 transition"
                     >
-                      <Ico name="zap" size={17} />
-                      {strings.common.testBtn}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onReset}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-[rgba(244,236,224,0.14)] bg-transparent px-3.5 py-3 text-sm font-extrabold text-[#a9b3c9] transition active:scale-[0.97]"
-                    >
-                      <Ico name="rotate_ccw" size={15} />
-                      {strings.common.resetBtn}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onAskMentor}
-                      disabled={mentorLoading}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-[rgba(244,236,224,0.14)] bg-transparent px-3.5 py-3 text-sm font-extrabold text-[#a9b3c9] transition active:scale-[0.97] disabled:opacity-60"
-                    >
-                      <Ico name="sparkles" size={16} />
-                      {strings.common.mentorBtn}
+                      <Ico name="zap" size={16} />
+                      <span>{isCompleted ? t.map.done : t.map.btnStart}</span>
                     </button>
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
+      )}
 
-                  {(mentorLoading || mentorBanner) && (
+      {/* ==================================================================== */}
+      {/* SCREEN 3: INTERACTIVE WORKBENCH & FORMULA LAB (MISSION SCREEN) */}
+      {/* ==================================================================== */}
+      {screen === "mission" && (
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
+          {/* Top Bar with Back Button */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => {
+                sfx.nav();
+                setScreen("map");
+              }}
+              className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#A1B5D8] hover:text-[#35D6FF] transition"
+            >
+              <Ico name="arrow_left" size={18} />
+              <span>{t.workbench.backBtn}</span>
+            </button>
+
+            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[#35D6FF]/15 text-[#35D6FF] border border-[#35D6FF]/30">
+              {t.missions[activeMissionId].region} · {t.missions[activeMissionId].location}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Circuit Workbench & AI Mentor */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Mission Header */}
+              <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 shadow-xl">
+                <h2 className="text-xl sm:text-2xl font-black text-[#F4F8FC] mb-2">
+                  {t.missions[activeMissionId].title}
+                </h2>
+                <p className="text-sm text-[#A1B5D8] leading-relaxed">{t.missions[activeMissionId].desc}</p>
+              </div>
+
+              {/* Circuit Board Visualizer */}
+              <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/30 relative overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#A1B5D8]">
+                    Схема электрической цепи
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block w-2.5 h-2.5 rounded-full ${
+                        circuitVisual === "success"
+                          ? "bg-[#26D07C] shadow-[0_0_8px_#26D07C]"
+                          : circuitVisual === "burnt"
+                          ? "bg-[#FF5353] shadow-[0_0_8px_#FF5353]"
+                          : "bg-[#A1B5D8]"
+                      }`}
+                    />
+                    <span className="text-xs font-bold uppercase text-[#A1B5D8]">{circuitVisual}</span>
+                  </div>
+                </div>
+
+                {/* The Interactive Schematic Circuit */}
+                <div className="relative py-8 px-4 flex flex-col sm:flex-row items-center justify-between gap-6 bg-[#081C36]/80 rounded-2xl border border-[#35D6FF]/15">
+                  {/* Node 1: Power Source */}
+                  <div className="flex flex-col items-center text-center p-3 rounded-2xl bg-[#0D2547] border border-[#35D6FF]/30 w-36">
+                    <div className="w-12 h-12 rounded-xl bg-[#377DFF]/20 text-[#35D6FF] flex items-center justify-center mb-2">
+                      <Ico name={activeMissionId === "issykkul" ? "wind" : "sun"} size={26} />
+                    </div>
+                    <span className="text-xs font-bold text-[#F4F8FC]">{t.missions[activeMissionId].sourceName}</span>
+                    <span className="text-[11px] font-extrabold text-[#FFD84D]">
+                      {t.missions[activeMissionId].sourceSpec}
+                    </span>
+                  </div>
+
+                  {/* Wire 1: Source to Slot */}
+                  <div className="flex-1 h-1.5 w-full sm:w-auto relative bg-[#0D2547] rounded-full overflow-hidden">
                     <div
-                      className={`rounded-2xl border px-4 py-3.5 text-[13.5px] leading-relaxed ${
-                        mentorBanner?.fallback
-                          ? "border-[rgba(244,236,224,0.14)] bg-[#1c2c4e]"
-                          : "border-[rgba(79,227,176,0.35)] bg-[rgba(31,79,67,0.55)]"
+                      className={`h-full w-full transition-all duration-500 ${
+                        circuitVisual === "success"
+                          ? "bg-[#35D6FF] shadow-[0_0_10px_#35D6FF]"
+                          : circuitVisual === "burnt"
+                          ? "bg-[#FF5353] shadow-[0_0_10px_#FF5353]"
+                          : "bg-[#377DFF]/40"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Node 2: Component Slot */}
+                  <div
+                    onClick={() => {
+                      if (selectedPart) {
+                        sfx.click();
+                        setPlacedPart(selectedPart);
+                      }
+                    }}
+                    className={`cursor-pointer flex flex-col items-center justify-center p-4 rounded-2xl min-w-[130px] min-h-[110px] border-2 border-dashed transition-all ${
+                      placedPart
+                        ? "border-[#35D6FF] bg-[#35D6FF]/10 shadow-[0_0_20px_rgba(53,214,255,0.2)]"
+                        : "border-[#35D6FF]/40 hover:border-[#35D6FF] bg-[#0D2547]/60"
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-[#A1B5D8] uppercase mb-1">
+                      {t.workbench.slotTitle}
+                    </span>
+                    {placedPart ? (
+                      <div className="flex flex-col items-center">
+                        <Ico name="zap" size={24} className="text-[#FFD84D] mb-1" />
+                        <span className="text-xs font-extrabold text-[#F4F8FC] text-center">
+                          {t.workbench.parts[placedPart]}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <span className="text-xs text-[#A1B5D8] font-bold block">{t.workbench.emptySlot}</span>
+                        <span className="text-[10px] text-[#35D6FF] mt-1 block">Нажми деталь ниже</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Wire 2: Slot to Consumer */}
+                  <div className="flex-1 h-1.5 w-full sm:w-auto relative bg-[#0D2547] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full w-full transition-all duration-500 ${
+                        circuitVisual === "success"
+                          ? "bg-[#35D6FF] shadow-[0_0_10px_#35D6FF]"
+                          : circuitVisual === "burnt"
+                          ? "bg-[#FF5353] shadow-[0_0_10px_#FF5353]"
+                          : "bg-[#377DFF]/40"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Node 3: Consumer Device */}
+                  <div className="flex flex-col items-center text-center p-3 rounded-2xl bg-[#0D2547] border border-[#35D6FF]/30 w-36">
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 transition-all ${
+                        circuitVisual === "success"
+                          ? "bg-[#26D07C]/25 text-[#26D07C] shadow-[0_0_15px_#26D07C]"
+                          : circuitVisual === "burnt"
+                          ? "bg-[#FF5353]/25 text-[#FF5353] shadow-[0_0_15px_#FF5353]"
+                          : "bg-[#377DFF]/20 text-[#A1B5D8]"
                       }`}
                     >
-                      <div className="mb-1.5 flex items-center gap-2 text-xs font-bold text-[#a9b3c9]">
-                        <Ico name="message_circle" size={16} style={{ color: accent }} />
-                        {mentorLoading ? (
-                          <span style={{ animation: "mentorPulse 1.2s ease-in-out infinite" }}>
-                            {strings.common.mentorLoading}
-                          </span>
-                        ) : (
-                          <span>
-                            AI Ментор
-                            {mentorBanner?.source ? ` · ${mentorBanner.source}` : ""}
-                            {mentorBanner?.fallback
-                              ? ` · ${strings.common.mentorFallbackTitle}`
-                              : ""}
-                          </span>
-                        )}
-                      </div>
-                      {!mentorLoading && mentorBanner && (
-                        <p className="m-0 text-[#f3ecdf]">{mentorBanner.answer}</p>
-                      )}
-                      {mentorLoading && (
-                        <div className="mt-2 h-2 w-2/3 animate-pulse rounded bg-[rgba(244,236,224,0.12)]" />
-                      )}
+                      <Ico name={circuitVisual === "burnt" ? "flame" : "wifi"} size={26} />
                     </div>
-                  )}
+                    <span className="text-xs font-bold text-[#F4F8FC]">{t.missions[activeMissionId].deviceName}</span>
+                    <span className="text-[11px] font-extrabold text-[#35D6FF]">
+                      {t.missions[activeMissionId].deviceSpec}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Circuit Test Buttons */}
+                <div className="mt-6 flex flex-wrap gap-3 items-center justify-between">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleTestCircuit}
+                      className="px-6 py-3 rounded-2xl font-extrabold text-sm bg-gradient-to-r from-[#377DFF] to-[#35D6FF] text-[#081C36] shadow-lg shadow-[#377DFF]/30 hover:scale-105 active:scale-95 transition flex items-center gap-2"
+                    >
+                      <Ico name="zap" size={17} />
+                      <span>{t.workbench.testBtn}</span>
+                    </button>
+                    <button
+                      onClick={handleResetCircuit}
+                      className="px-5 py-3 rounded-2xl font-bold text-sm bg-[#081C36] hover:bg-[#35D6FF]/10 text-[#A1B5D8] border border-[#35D6FF]/20 transition flex items-center gap-2"
+                    >
+                      <Ico name="rotate_ccw" size={16} />
+                      <span>{t.workbench.resetBtn}</span>
+                    </button>
+                  </div>
 
                   {feedback && (
                     <div
-                      className={`fade-enter flex gap-2.5 rounded-2xl border px-4 py-3.5 text-[13.5px] leading-relaxed ${
+                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border ${
                         feedback.kind === "success"
-                          ? "border-[#4fe3b0] bg-[#1f4f43]"
-                          : "border-[#ff6b4a] bg-[#3a2030]"
+                          ? "bg-[#26D07C]/15 border-[#26D07C]/40 text-[#26D07C]"
+                          : "bg-[#FF5353]/15 border-[#FF5353]/40 text-[#FF5353]"
                       }`}
                     >
-                      <Ico
-                        name={feedback.kind === "success" ? "circle_check_big" : "flame"}
-                        size={20}
-                        className={
-                          feedback.kind === "success" ? "text-[#4fe3b0]" : "text-[#ff6b4a]"
-                        }
-                      />
-                      <div>
-                        <div className="mb-1 flex flex-wrap items-center gap-2 text-sm font-extrabold">
-                          {feedback.title}
-                          {feedback.stars > 0 && <StarRow n={feedback.stars} size={14} />}
-                        </div>
-                        <div>{feedback.body}</div>
-                        {feedback.tryAgain && (
-                          <div className="mt-2 text-[12.5px] text-[#a9b3c9]">
-                            {strings.common.tryAgain}
-                          </div>
-                        )}
-                      </div>
+                      <Ico name={feedback.kind === "success" ? "circle_check" : "flame"} size={16} />
+                      <span>{feedback.title}</span>
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* Formula lab column */}
-                <FormulaLab missionId={missionId} lang={lang} accent={accent} />
+              {/* Warehouse / Palette of Parts */}
+              <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#A1B5D8] mb-3">
+                  {t.workbench.warehouseTitle}
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {Object.entries(t.workbench.parts).map(([key, name]) => {
+                    const isSelected = selectedPart === key;
+                    const isPlaced = placedPart === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          sfx.click();
+                          setSelectedPart(key);
+                          setPlacedPart(key);
+                        }}
+                        className={`p-3.5 rounded-2xl border text-left transition flex items-center gap-3 ${
+                          isPlaced
+                            ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC] shadow-lg shadow-[#35D6FF]/20"
+                            : isSelected
+                            ? "bg-[#377DFF]/25 border-[#377DFF] text-[#F4F8FC]"
+                            : "bg-[#081C36]/80 border-[#35D6FF]/15 text-[#A1B5D8] hover:border-[#35D6FF]/40 hover:text-[#F4F8FC]"
+                        }`}
+                      >
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            isPlaced ? "bg-[#35D6FF] text-[#081C36]" : "bg-[#0D2547] text-[#35D6FF]"
+                          }`}
+                        >
+                          <Ico name="zap" size={18} />
+                        </div>
+                        <span className="text-xs font-bold leading-snug">{name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* AI Mentor Banner */}
+              <div className="p-5 rounded-3xl bg-gradient-to-r from-[#0D2547] to-[#081C36] border border-[#35D6FF]/30 shadow-lg relative overflow-hidden">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#377DFF] to-[#35D6FF] text-[#081C36] flex items-center justify-center shrink-0 shadow-md">
+                    <Ico name="bot" size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-[#F4F8FC]">{t.workbench.mentorTitle}</span>
+                        {mentorLoading && (
+                          <span className="w-2 h-2 rounded-full bg-[#35D6FF] animate-ping" />
+                        )}
+                      </div>
+                      {mentorData?.source && (
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#35D6FF]/15 text-[#35D6FF] border border-[#35D6FF]/30 uppercase">
+                          {mentorData.source}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#A1B5D8] leading-relaxed">
+                      {mentorLoading
+                        ? t.workbench.mentorThinking
+                        : mentorData?.answer ||
+                          "Собери схему и нажми 'Подать ток', или нажми на кнопку ниже, чтобы получить совет AI-наставника."}
+                    </p>
+                    <button
+                      onClick={async () => {
+                        sfx.click();
+                        setMentorLoading(true);
+                        const cur = t.missions[activeMissionId];
+                        const resp = await fetchAskMentor({
+                          question: `Подскажи физический принцип для миссии: ${cur.title}`,
+                          circuit_state: placedPart === cur.correctPart ? 3 : 1,
+                          lang,
+                        });
+                        setMentorData(resp);
+                        setMentorLoading(false);
+                      }}
+                      className="mt-3 text-xs font-extrabold text-[#35D6FF] hover:underline flex items-center gap-1.5"
+                    >
+                      <Ico name="sparkles" size={14} />
+                      <span>{t.workbench.askMentorBtn}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Col: Interactive Formula Laboratory */}
+            <div className="space-y-6">
+              <FormulaPlayground
+                missionId={activeMissionId}
+                lang={lang}
+                t={t.missions[activeMissionId]}
+                sfx={sfx}
+              />
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* ==================================================================== */}
+      {/* SCREEN 4: ADVANCED PHYSICS LABS (10–11th GRADE FASTAPI INTEGRATION) */}
+      {/* ==================================================================== */}
+      {screen === "advanced" && (
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+            <div>
+              <div className="flex items-center gap-2 text-[#35D6FF] text-xs font-bold uppercase tracking-wider mb-1">
+                <Ico name="activity" size={16} />
+                <span>10–11-класс · FastAPI & NumPy Compute Engine</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-[#F4F8FC]">{t.advanced.title}</h2>
+              <p className="text-sm text-[#A1B5D8]">{t.advanced.subtitle}</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={async () => {
+                  sfx.click();
+                  let payload = {};
+                  if (activeAdvTab === "projectile") {
+                    payload = {
+                      user_id: "student_flux",
+                      lesson_id: "projectile-01",
+                      lab_title: "Кинематика и баллистика",
+                      input_parameters: projectileParams,
+                      table_points: (projectileResult?.points || []).slice(0, 50),
+                      conclusions: `Максимальная высота: ${projectileResult?.max_height}м, Дальность: ${projectileResult?.max_range}м`,
+                    };
+                  } else if (activeAdvTab === "pendulum") {
+                    payload = {
+                      user_id: "student_flux",
+                      lesson_id: "pendulum-01",
+                      lab_title: "Колебания и маятники",
+                      input_parameters: pendulumParams,
+                      table_points: (pendulumResult?.displacement_graph || []).slice(0, 50),
+                      conclusions: `Период: ${pendulumResult?.period}с, Частота: ${pendulumResult?.frequency}Гц`,
+                    };
+                  } else {
+                    payload = {
+                      user_id: "student_flux",
+                      lesson_id: "gas-laws-01",
+                      lab_title: "Изопроцессы идеального газа",
+                      input_parameters: gasParams,
+                      table_points: gasResult?.points || [],
+                      conclusions: `Работа газа: ${gasResult?.total_work} Дж, Изменение энергии: ${gasResult?.total_internal_energy_change} Дж`,
+                    };
+                  }
+                  await triggerReportExport(payload);
+                }}
+                className="px-4 py-2.5 rounded-2xl bg-[#0D2547] hover:bg-[#35D6FF]/15 text-[#35D6FF] border border-[#35D6FF]/40 text-xs sm:text-sm font-extrabold flex items-center gap-2 shadow-lg transition"
+              >
+                <Ico name="download" size={17} />
+                <span>{t.advanced.exportBtn}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Subtabs for 3 Labs */}
+          <div className="flex flex-wrap gap-2 mb-6 border-b border-[#35D6FF]/20 pb-4">
+            {[
+              { id: "projectile", title: t.advanced.tabProjectile, icon: "rocket" },
+              { id: "pendulum", title: t.advanced.tabPendulum, icon: "waves" },
+              { id: "gas", title: t.advanced.tabGas, icon: "thermometer" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  sfx.click();
+                  setActiveAdvTab(tab.id);
+                }}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+                  activeAdvTab === tab.id
+                    ? "bg-[#377DFF] text-[#F4F8FC] shadow-lg shadow-[#377DFF]/30"
+                    : "bg-[#0D2547] text-[#A1B5D8] hover:text-[#F4F8FC] border border-[#35D6FF]/15"
+                }`}
+              >
+                <Ico name={tab.icon} size={17} />
+                <span>{tab.title}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* LAB 1: PROJECTILE MOTION */}
+          {activeAdvTab === "projectile" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Controls Column */}
+              <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 space-y-4">
+                <h3 className="font-black text-base text-[#F4F8FC] mb-4">Параметры броска</h3>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.projectile.v0}</span>
+                    <span className="text-[#35D6FF]">{projectileParams.initial_velocity} м/с</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={5}
+                    max={80}
+                    step={1}
+                    value={projectileParams.initial_velocity}
+                    onChange={(e) =>
+                      setProjectileParams({ ...projectileParams, initial_velocity: Number(e.target.value) })
+                    }
+                    className="w-full accent-[#35D6FF]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.projectile.angle}</span>
+                    <span className="text-[#FFD84D]">{projectileParams.angle_deg}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={5}
+                    max={85}
+                    step={1}
+                    value={projectileParams.angle_deg}
+                    onChange={(e) =>
+                      setProjectileParams({ ...projectileParams, angle_deg: Number(e.target.value) })
+                    }
+                    className="w-full accent-[#FFD84D]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.projectile.h0}</span>
+                    <span className="text-[#F4F8FC]">{projectileParams.initial_height} м</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={50}
+                    step={1}
+                    value={projectileParams.initial_height}
+                    onChange={(e) =>
+                      setProjectileParams({ ...projectileParams, initial_height: Number(e.target.value) })
+                    }
+                    className="w-full accent-[#377DFF]"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-[#35D6FF]/15">
+                  <label className="flex items-center gap-2 text-xs font-bold text-[#F4F8FC] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={projectileParams.air_resistance}
+                      onChange={(e) =>
+                        setProjectileParams({ ...projectileParams, air_resistance: e.target.checked })
+                      }
+                      className="w-4 h-4 rounded text-[#377DFF] accent-[#35D6FF]"
+                    />
+                    <span>{t.advanced.projectile.drag}</span>
+                  </label>
+                </div>
+
+                <div>
+                  <span className="text-xs font-bold text-[#A1B5D8] block mb-2">{t.advanced.projectile.env}</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    {[
+                      { name: "Земля", g: 9.807, rho: 1.225 },
+                      { name: "Марс", g: 3.711, rho: 0.02 },
+                      { name: "Луна", g: 1.62, rho: 0.0 },
+                      { name: "Вода", g: 9.807, rho: 1000 },
+                    ].map((env) => (
+                      <button
+                        key={env.name}
+                        onClick={() =>
+                          setProjectileParams({ ...projectileParams, gravity: env.g, air_density: env.rho })
+                        }
+                        className={`p-2 rounded-xl border text-center transition ${
+                          projectileParams.gravity === env.g && projectileParams.air_density === env.rho
+                            ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC]"
+                            : "bg-[#081C36] border-[#35D6FF]/15 text-[#A1B5D8]"
+                        }`}
+                      >
+                        {env.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => runAdvancedSim("projectile")}
+                  disabled={advLoading}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#377DFF] to-[#35D6FF] text-[#081C36] font-black text-sm shadow-xl shadow-[#377DFF]/30 hover:scale-105 active:scale-95 transition mt-4"
+                >
+                  {advLoading ? t.advanced.calculating : t.advanced.runBtn}
+                </button>
+              </div>
+
+              {/* SVG Visualization & Telemetry */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/25">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#A1B5D8] mb-3">
+                    Траектория полёта y(x)
+                  </h4>
+                  <TrajectoryCanvas points={projectileResult?.points || []} />
+                </div>
+
+                {/* Telemetry Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <TelemetryCard
+                    label={t.advanced.projectile.telemetry.range}
+                    value={projectileResult?.max_range ?? "--"}
+                    unit="м"
+                    color="#35D6FF"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.projectile.telemetry.height}
+                    value={projectileResult?.max_height ?? "--"}
+                    unit="м"
+                    color="#FFD84D"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.projectile.telemetry.time}
+                    value={projectileResult?.flight_time ?? "--"}
+                    unit="с"
+                    color="#26D07C"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.projectile.telemetry.energy}
+                    value={projectileResult?.initial_kinetic_energy ?? "--"}
+                    unit="Дж"
+                    color="#377DFF"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* LAB 2: PENDULUM OSCILLATIONS */}
+          {activeAdvTab === "pendulum" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Controls Column */}
+              <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 space-y-4">
+                <h3 className="font-black text-base text-[#F4F8FC] mb-4">Параметры маятника</h3>
+
+                <div>
+                  <span className="text-xs font-bold text-[#A1B5D8] block mb-2">{t.advanced.pendulum.type}</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    <button
+                      onClick={() => setPendulumParams({ ...pendulumParams, pendulum_type: "simple" })}
+                      className={`p-2.5 rounded-xl border transition ${
+                        pendulumParams.pendulum_type === "simple"
+                          ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC]"
+                          : "bg-[#081C36] border-[#35D6FF]/15 text-[#A1B5D8]"
+                      }`}
+                    >
+                      {t.advanced.pendulum.typeSimple}
+                    </button>
+                    <button
+                      onClick={() => setPendulumParams({ ...pendulumParams, pendulum_type: "spring" })}
+                      className={`p-2.5 rounded-xl border transition ${
+                        pendulumParams.pendulum_type === "spring"
+                          ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC]"
+                          : "bg-[#081C36] border-[#35D6FF]/15 text-[#A1B5D8]"
+                      }`}
+                    >
+                      {t.advanced.pendulum.typeSpring}
+                    </button>
+                  </div>
+                </div>
+
+                {pendulumParams.pendulum_type === "simple" ? (
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-[#A1B5D8]">{t.advanced.pendulum.length}</span>
+                      <span className="text-[#35D6FF]">{pendulumParams.length} м</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={5.0}
+                      step={0.1}
+                      value={pendulumParams.length}
+                      onChange={(e) => setPendulumParams({ ...pendulumParams, length: Number(e.target.value) })}
+                      className="w-full accent-[#35D6FF]"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-[#A1B5D8]">{t.advanced.pendulum.k}</span>
+                      <span className="text-[#35D6FF]">{pendulumParams.spring_constant} Н/м</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={5}
+                      max={100}
+                      step={1}
+                      value={pendulumParams.spring_constant}
+                      onChange={(e) =>
+                        setPendulumParams({ ...pendulumParams, spring_constant: Number(e.target.value) })
+                      }
+                      className="w-full accent-[#35D6FF]"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.pendulum.mass}</span>
+                    <span className="text-[#FFD84D]">{pendulumParams.mass} кг</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={10.0}
+                    step={0.1}
+                    value={pendulumParams.mass}
+                    onChange={(e) => setPendulumParams({ ...pendulumParams, mass: Number(e.target.value) })}
+                    className="w-full accent-[#FFD84D]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.pendulum.damping}</span>
+                    <span className="text-[#F4F8FC]">{pendulumParams.damping_coefficient}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.0}
+                    max={1.5}
+                    step={0.05}
+                    value={pendulumParams.damping_coefficient}
+                    onChange={(e) =>
+                      setPendulumParams({ ...pendulumParams, damping_coefficient: Number(e.target.value) })
+                    }
+                    className="w-full accent-[#377DFF]"
+                  />
+                </div>
+
+                <button
+                  onClick={() => runAdvancedSim("pendulum")}
+                  disabled={advLoading}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#377DFF] to-[#35D6FF] text-[#081C36] font-black text-sm shadow-xl shadow-[#377DFF]/30 hover:scale-105 active:scale-95 transition mt-4"
+                >
+                  {advLoading ? t.advanced.calculating : t.advanced.runBtn}
+                </button>
+              </div>
+
+              {/* Wave Plot & Telemetry */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/25">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#A1B5D8] mb-3">
+                    График затухающих колебаний x(t)
+                  </h4>
+                  <WaveCanvas points={pendulumResult?.displacement_graph || []} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <TelemetryCard
+                    label={t.advanced.pendulum.telemetry.period}
+                    value={pendulumResult?.period ?? "--"}
+                    unit="с"
+                    color="#35D6FF"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.pendulum.telemetry.freq}
+                    value={pendulumResult?.frequency ?? "--"}
+                    unit="Гц"
+                    color="#FFD84D"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.pendulum.telemetry.omega}
+                    value={pendulumResult?.angular_frequency ?? "--"}
+                    unit="рад/с"
+                    color="#26D07C"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* LAB 3: GAS LAWS (THERMODYNAMICS) */}
+          {activeAdvTab === "gas" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Controls Column */}
+              <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 space-y-4">
+                <h3 className="font-black text-base text-[#F4F8FC] mb-4">Параметры газа</h3>
+
+                <div>
+                  <span className="text-xs font-bold text-[#A1B5D8] block mb-2">{t.advanced.gas.process}</span>
+                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
+                    <button
+                      onClick={() => setGasParams({ ...gasParams, process_type: "isothermal", target_value: 0.048 })}
+                      className={`p-2 rounded-xl border text-center transition ${
+                        gasParams.process_type === "isothermal"
+                          ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC]"
+                          : "bg-[#081C36] border-[#35D6FF]/15 text-[#A1B5D8]"
+                      }`}
+                    >
+                      T = const
+                    </button>
+                    <button
+                      onClick={() => setGasParams({ ...gasParams, process_type: "isochoric", target_value: 450 })}
+                      className={`p-2 rounded-xl border text-center transition ${
+                        gasParams.process_type === "isochoric"
+                          ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC]"
+                          : "bg-[#081C36] border-[#35D6FF]/15 text-[#A1B5D8]"
+                      }`}
+                    >
+                      V = const
+                    </button>
+                    <button
+                      onClick={() => setGasParams({ ...gasParams, process_type: "isobaric", target_value: 0.048 })}
+                      className={`p-2 rounded-xl border text-center transition ${
+                        gasParams.process_type === "isobaric"
+                          ? "bg-[#35D6FF]/20 border-[#35D6FF] text-[#F4F8FC]"
+                          : "bg-[#081C36] border-[#35D6FF]/15 text-[#A1B5D8]"
+                      }`}
+                    >
+                      P = const
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.gas.moles}</span>
+                    <span className="text-[#35D6FF]">{gasParams.moles} моль</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={5.0}
+                    step={0.1}
+                    value={gasParams.moles}
+                    onChange={(e) => setGasParams({ ...gasParams, moles: Number(e.target.value) })}
+                    className="w-full accent-[#35D6FF]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.gas.t0}</span>
+                    <span className="text-[#FFD84D]">{Math.round(gasParams.initial_temperature)} К</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={200}
+                    max={600}
+                    step={5}
+                    value={gasParams.initial_temperature}
+                    onChange={(e) => setGasParams({ ...gasParams, initial_temperature: Number(e.target.value) })}
+                    className="w-full accent-[#FFD84D]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-[#A1B5D8]">{t.advanced.gas.target}</span>
+                    <span className="text-[#26D07C]">
+                      {gasParams.process_type === "isochoric"
+                        ? `${Math.round(gasParams.target_value)} К`
+                        : `${(gasParams.target_value * 1000).toFixed(1)} л`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={gasParams.process_type === "isochoric" ? 250 : 0.015}
+                    max={gasParams.process_type === "isochoric" ? 800 : 0.08}
+                    step={gasParams.process_type === "isochoric" ? 10 : 0.002}
+                    value={gasParams.target_value}
+                    onChange={(e) => setGasParams({ ...gasParams, target_value: Number(e.target.value) })}
+                    className="w-full accent-[#26D07C]"
+                  />
+                </div>
+
+                <button
+                  onClick={() => runAdvancedSim("gas")}
+                  disabled={advLoading}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#377DFF] to-[#35D6FF] text-[#081C36] font-black text-sm shadow-xl shadow-[#377DFF]/30 hover:scale-105 active:scale-95 transition mt-4"
+                >
+                  {advLoading ? t.advanced.calculating : t.advanced.runBtn}
+                </button>
+              </div>
+
+              {/* PV Diagram & Telemetry */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/25">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#A1B5D8] mb-3">
+                    Диаграмма процесса P-V (Работа газа = площадь под кривой)
+                  </h4>
+                  <PvDiagramCanvas points={gasResult?.points || []} />
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <TelemetryCard
+                    label={t.advanced.gas.telemetry.work}
+                    value={gasResult?.total_work ?? "--"}
+                    unit="Дж"
+                    color="#35D6FF"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.gas.telemetry.deltaU}
+                    value={gasResult?.total_internal_energy_change ?? "--"}
+                    unit="Дж"
+                    color="#FFD84D"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.gas.telemetry.finalP}
+                    value={gasResult?.final_state?.pressure ? Math.round(gasResult.final_state.pressure / 1000) : "--"}
+                    unit="кПа"
+                    color="#26D07C"
+                  />
+                  <TelemetryCard
+                    label={t.advanced.gas.telemetry.finalT}
+                    value={gasResult?.final_state?.temperature ? Math.round(gasResult.final_state.temperature) : "--"}
+                    unit="К"
+                    color="#377DFF"
+                  />
+                </div>
               </div>
             </div>
           )}
         </main>
+      )}
+
+      {/* ==================================================================== */}
+      {/* FOOTER */}
+      {/* ==================================================================== */}
+      <footer className="mt-auto border-t border-[#35D6FF]/15 py-6 px-4 sm:px-6 bg-[#081C36] text-xs text-[#A1B5D8]">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex items-center gap-2">
+            <img src="/logo.svg" alt="FluxLab" className="h-5 w-auto" />
+            <span className="font-bold text-[#F4F8FC]">FluxLab</span>
+            <span>· Кыргызстан (Нарын · Ысык-Көл · Ош)</span>
+          </div>
+          <p>© 2026 FluxLab. Production-grade Physics Simulator & Fast Learning Environment.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// ============================================================================
+// HELPER COMPONENTS & VISUALIZERS
+// ============================================================================
+
+function TelemetryCard({ label, value, unit, color }) {
+  return (
+    <div className="p-4 rounded-2xl bg-[#081C36]/90 border border-[#35D6FF]/15 flex flex-col justify-between">
+      <span className="text-[11px] font-bold text-[#A1B5D8] mb-1">{label}</span>
+      <div className="flex items-baseline gap-1">
+        <span className="text-xl sm:text-2xl font-black tabular-nums" style={{ color }}>
+          {value}
+        </span>
+        <span className="text-xs font-bold text-[#A1B5D8]">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function TrajectoryCanvas({ points }) {
+  if (!points || points.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-xs text-[#A1B5D8] bg-[#081C36]/60 rounded-2xl border border-dashed border-[#35D6FF]/20">
+        Нажмите "Запустить симуляцию" для построения баллистической траектории
+      </div>
+    );
+  }
+
+  const maxX = Math.max(...points.map((p) => p.x), 10);
+  const maxY = Math.max(...points.map((p) => p.y), 10);
+
+  const w = 600;
+  const h = 240;
+  const pad = 35;
+
+  const toX = (x) => pad + (x / maxX) * (w - pad * 2);
+  const toY = (y) => h - pad - (y / maxY) * (h - pad * 2);
+
+  const pathD = points.reduce((acc, p, idx) => {
+    return `${acc} ${idx === 0 ? "M" : "L"} ${toX(p.x)} ${toY(p.y)}`;
+  }, "");
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-64 bg-[#081C36]/90 rounded-2xl border border-[#35D6FF]/20">
+      {/* Grid lines */}
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="rgba(53,214,255,0.4)" strokeWidth={2} />
+      <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="rgba(53,214,255,0.4)" strokeWidth={2} />
+
+      {/* Trajectory */}
+      <path d={pathD} fill="none" stroke="#35D6FF" strokeWidth={3} strokeLinecap="round" />
+
+      {/* Peak Point */}
+      {points.length > 0 && (
+        <circle
+          cx={toX(points.reduce((max, p) => (p.y > max.y ? p : max), points[0]).x)}
+          cy={toY(Math.max(...points.map((p) => p.y)))}
+          r={5}
+          fill="#FFD84D"
+        />
+      )}
+
+      {/* Text labels */}
+      <text x={pad} y={h - 10} fill="#A1B5D8" fontSize={10} fontWeight="bold">
+        0 м
+      </text>
+      <text x={w - pad - 30} y={h - 10} fill="#A1B5D8" fontSize={10} fontWeight="bold">
+        {Math.round(maxX)} м
+      </text>
+      <text x={10} y={pad + 10} fill="#A1B5D8" fontSize={10} fontWeight="bold">
+        {Math.round(maxY)} м
+      </text>
+    </svg>
+  );
+}
+
+function WaveCanvas({ points }) {
+  if (!points || points.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-xs text-[#A1B5D8] bg-[#081C36]/60 rounded-2xl border border-dashed border-[#35D6FF]/20">
+        Нажмите "Запустить симуляцию" для построения волновой функции
+      </div>
+    );
+  }
+
+  const w = 600;
+  const h = 240;
+  const pad = 35;
+
+  const maxT = Math.max(...points.map((p) => p.t), 5);
+  const maxDisp = Math.max(...points.map((p) => Math.abs(p.displacement)), 0.1);
+
+  const toX = (t) => pad + (t / maxT) * (w - pad * 2);
+  const toY = (x) => h / 2 - (x / maxDisp) * (h / 2 - pad);
+
+  const pathD = points.reduce((acc, p, idx) => {
+    return `${acc} ${idx === 0 ? "M" : "L"} ${toX(p.t)} ${toY(p.displacement)}`;
+  }, "");
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-64 bg-[#081C36]/90 rounded-2xl border border-[#35D6FF]/20">
+      {/* Zero line */}
+      <line x1={pad} y1={h / 2} x2={w - pad} y2={h / 2} stroke="rgba(161,181,216,0.3)" strokeDasharray="4 4" />
+      <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="rgba(53,214,255,0.4)" strokeWidth={2} />
+
+      {/* Wave Path */}
+      <path d={pathD} fill="none" stroke="#FFD84D" strokeWidth={2.5} />
+    </svg>
+  );
+}
+
+function PvDiagramCanvas({ points }) {
+  if (!points || points.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-xs text-[#A1B5D8] bg-[#081C36]/60 rounded-2xl border border-dashed border-[#35D6FF]/20">
+        Нажмите "Запустить симуляцию" для построения P-V диаграммы
+      </div>
+    );
+  }
+
+  const w = 600;
+  const h = 240;
+  const pad = 40;
+
+  const maxV = Math.max(...points.map((p) => p.volume));
+  const minV = Math.min(...points.map((p) => p.volume));
+  const maxP = Math.max(...points.map((p) => p.pressure));
+  const minP = Math.min(...points.map((p) => p.pressure));
+
+  const toX = (v) => pad + ((v - minV) / (maxV - minV || 1)) * (w - pad * 2);
+  const toY = (p) => h - pad - ((p - minP) / (maxP - minP || 1)) * (h - pad * 2);
+
+  const curveD = points.reduce((acc, p, idx) => {
+    return `${acc} ${idx === 0 ? "M" : "L"} ${toX(p.volume)} ${toY(p.pressure)}`;
+  }, "");
+
+  const fillD = `${curveD} L ${toX(points[points.length - 1].volume)} ${h - pad} L ${toX(points[0].volume)} ${h - pad} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-64 bg-[#081C36]/90 rounded-2xl border border-[#35D6FF]/20">
+      {/* Shaded Work Area */}
+      <path d={fillD} fill="rgba(53,214,255,0.15)" />
+
+      {/* Process curve */}
+      <path d={curveD} fill="none" stroke="#35D6FF" strokeWidth={3} />
+
+      {/* Axes */}
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="rgba(53,214,255,0.5)" strokeWidth={2} />
+      <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="rgba(53,214,255,0.5)" strokeWidth={2} />
+
+      <text x={w - pad - 20} y={h - 15} fill="#A1B5D8" fontSize={11} fontWeight="bold">
+        V (л)
+      </text>
+      <text x={10} y={pad + 10} fill="#A1B5D8" fontSize={11} fontWeight="bold">
+        P (кПа)
+      </text>
+    </svg>
+  );
+}
+
+// ============================================================================
+// INTERACTIVE FORMULA PLAYGROUND (MISSION-SPECIFIC)
+// ============================================================================
+
+function FormulaPlayground({ missionId, lang, t, sfx }) {
+  // Naryn: Voltage divider
+  const [uin, setUin] = useState(24);
+  const [r1, setR1] = useState(1000);
+  const [r2, setR2] = useState(1000);
+
+  // Issyk-Kul: Wind generator
+  const [windUin, setWindUin] = useState(16);
+  const [stabMode, setStabMode] = useState("stabilizer");
+
+  // Osh: Solar & reverse current
+  const [isDay, setIsDay] = useState(true);
+  const [hasDiode, setHasDiode] = useState(true);
+  const [loadR, setLoadR] = useState(6);
+
+  if (missionId === "naryn") {
+    const uout = (uin * r2) / (r1 + r2);
+    const isSafe = uout >= 11.5 && uout <= 12.5;
+
+    return (
+      <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 space-y-4">
+        <h3 className="font-black text-sm text-[#F4F8FC] uppercase tracking-wider">{t.labTitle}</h3>
+        <div className="p-3 rounded-2xl bg-[#081C36] border border-[#35D6FF]/20 font-mono text-xs text-[#35D6FF] text-center">
+          U_out = U_in × R₂ / (R₁ + R₂)
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className="text-[#A1B5D8]">{t.lUin}</span>
+            <span className="text-[#F4F8FC]">{uin} В</span>
+          </div>
+          <input
+            type="range"
+            min={12}
+            max={36}
+            value={uin}
+            onChange={(e) => setUin(Number(e.target.value))}
+            className="w-full accent-[#35D6FF]"
+          />
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className="text-[#A1B5D8]">{t.lR1}</span>
+            <span className="text-[#F4F8FC]">{r1} Ом</span>
+          </div>
+          <input
+            type="range"
+            min={100}
+            max={4000}
+            step={100}
+            value={r1}
+            onChange={(e) => setR1(Number(e.target.value))}
+            className="w-full accent-[#377DFF]"
+          />
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className="text-[#A1B5D8]">{t.lR2}</span>
+            <span className="text-[#F4F8FC]">{r2} Ом</span>
+          </div>
+          <input
+            type="range"
+            min={100}
+            max={4000}
+            step={100}
+            value={r2}
+            onChange={(e) => setR2(Number(e.target.value))}
+            className="w-full accent-[#FFD84D]"
+          />
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[#081C36] border border-[#35D6FF]/20 text-center">
+          <span className="text-xs text-[#A1B5D8] font-bold block mb-1">{t.lUout}</span>
+          <span
+            className={`text-3xl font-black tabular-nums ${
+              isSafe ? "text-[#26D07C]" : uout > 12.5 ? "text-[#FF5353]" : "text-[#FFD84D]"
+            }`}
+          >
+            {uout.toFixed(1)} В
+          </span>
+          <p
+            className={`text-xs font-bold mt-1 ${
+              isSafe ? "text-[#26D07C]" : uout > 12.5 ? "text-[#FF5353]" : "text-[#FFD84D]"
+            }`}
+          >
+            {isSafe ? t.safeMsg : uout > 12.5 ? t.highMsg : t.lowMsg}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (missionId === "issykkul") {
+    const outputU = stabMode === "stabilizer" ? (windUin >= 6.5 ? 5.0 : Math.max(0, windUin - 1.5)) : windUin - 9.0;
+    const isSafe = outputU >= 4.8 && outputU <= 5.2;
+
+    return (
+      <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 space-y-4">
+        <h3 className="font-black text-sm text-[#F4F8FC] uppercase tracking-wider">{t.labTitle}</h3>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => {
+              sfx.click();
+              setStabMode("resistor");
+            }}
+            className={`p-2.5 rounded-xl text-xs font-bold border transition ${
+              stabMode === "resistor"
+                ? "bg-[#377DFF] text-[#F4F8FC] border-[#377DFF]"
+                : "bg-[#081C36] text-[#A1B5D8] border-[#35D6FF]/15"
+            }`}
+          >
+            {t.modeResistor}
+          </button>
+          <button
+            onClick={() => {
+              sfx.click();
+              setStabMode("stabilizer");
+            }}
+            className={`p-2.5 rounded-xl text-xs font-bold border transition ${
+              stabMode === "stabilizer"
+                ? "bg-[#35D6FF] text-[#081C36] border-[#35D6FF]"
+                : "bg-[#081C36] text-[#A1B5D8] border-[#35D6FF]/15"
+            }`}
+          >
+            {t.modeStabilizer}
+          </button>
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className="text-[#A1B5D8]">{t.lUin}</span>
+            <span className="text-[#F4F8FC]">{windUin} В</span>
+          </div>
+          <input
+            type="range"
+            min={5}
+            max={24}
+            value={windUin}
+            onChange={(e) => setWindUin(Number(e.target.value))}
+            className="w-full accent-[#35D6FF]"
+          />
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[#081C36] border border-[#35D6FF]/20 text-center">
+          <span className="text-xs text-[#A1B5D8] font-bold block mb-1">Выход на зарядку (5.0 В)</span>
+          <span
+            className={`text-3xl font-black tabular-nums ${
+              isSafe ? "text-[#26D07C]" : outputU > 5.2 ? "text-[#FF5353]" : "text-[#FFD84D]"
+            }`}
+          >
+            {outputU.toFixed(1)} В
+          </span>
+          <p
+            className={`text-xs font-bold mt-1 ${
+              isSafe ? "text-[#26D07C]" : outputU > 5.2 ? "text-[#FF5353]" : "text-[#FFD84D]"
+            }`}
+          >
+            {isSafe ? t.safeMsg : outputU > 5.2 ? t.highMsg : t.lowMsg}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Osh
+  const currentI = isDay ? (18 - 12) / loadR : hasDiode ? 0 : -12 / loadR;
+  const isSafe = currentI >= 0;
+
+  return (
+    <div className="p-6 rounded-3xl bg-[#0D2547] border border-[#35D6FF]/20 space-y-4">
+      <h3 className="font-black text-sm text-[#F4F8FC] uppercase tracking-wider">{t.labTitle}</h3>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => {
+            sfx.click();
+            setIsDay(true);
+          }}
+          className={`p-2.5 rounded-xl text-xs font-bold border transition ${
+            isDay
+              ? "bg-[#FFD84D] text-[#081C36] border-[#FFD84D]"
+              : "bg-[#081C36] text-[#A1B5D8] border-[#35D6FF]/15"
+          }`}
+        >
+          {t.dayBtn}
+        </button>
+        <button
+          onClick={() => {
+            sfx.click();
+            setIsDay(false);
+          }}
+          className={`p-2.5 rounded-xl text-xs font-bold border transition ${
+            !isDay
+              ? "bg-[#377DFF] text-[#F4F8FC] border-[#377DFF]"
+              : "bg-[#081C36] text-[#A1B5D8] border-[#35D6FF]/15"
+          }`}
+        >
+          {t.nightBtn}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => {
+            sfx.click();
+            setHasDiode(true);
+          }}
+          className={`p-2 rounded-xl text-xs font-bold border transition ${
+            hasDiode
+              ? "bg-[#35D6FF] text-[#081C36] border-[#35D6FF]"
+              : "bg-[#081C36] text-[#A1B5D8] border-[#35D6FF]/15"
+          }`}
+        >
+          {t.diodeOn}
+        </button>
+        <button
+          onClick={() => {
+            sfx.click();
+            setHasDiode(false);
+          }}
+          className={`p-2 rounded-xl text-xs font-bold border transition ${
+            !hasDiode
+              ? "bg-[#FF5353] text-[#F4F8FC] border-[#FF5353]"
+              : "bg-[#081C36] text-[#A1B5D8] border-[#35D6FF]/15"
+          }`}
+        >
+          {t.diodeOff}
+        </button>
+      </div>
+
+      <div>
+        <div className="flex justify-between text-xs font-bold mb-1">
+          <span className="text-[#A1B5D8]">{t.lR}</span>
+          <span className="text-[#F4F8FC]">{loadR} Ом</span>
+        </div>
+        <input
+          type="range"
+          min={2}
+          max={20}
+          value={loadR}
+          onChange={(e) => setLoadR(Number(e.target.value))}
+          className="w-full accent-[#35D6FF]"
+        />
+      </div>
+
+      <div className="p-4 rounded-2xl bg-[#081C36] border border-[#35D6FF]/20 text-center">
+        <span className="text-xs text-[#A1B5D8] font-bold block mb-1">{t.lI}</span>
+        <span
+          className={`text-3xl font-black tabular-nums ${
+            isSafe ? (currentI > 0 ? "text-[#26D07C]" : "text-[#35D6FF]") : "text-[#FF5353]"
+          }`}
+        >
+          {currentI.toFixed(2)} А
+        </span>
+        <p
+          className={`text-xs font-bold mt-1 ${
+            isSafe ? (currentI > 0 ? "text-[#26D07C]" : "text-[#35D6FF]") : "text-[#FF5353]"
+          }`}
+        >
+          {isDay ? t.safeDay : hasDiode ? t.safeNight : t.badNight}
+        </p>
       </div>
     </div>
   );
