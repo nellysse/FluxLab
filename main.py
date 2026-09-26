@@ -564,78 +564,120 @@ class ExportReportRequest(BaseModel):
 
 
 class AskMentorRequest(BaseModel):
-    question: str = Field(..., description="Вопрос пользователя или контекст")
-    circuit_state: int = Field(1, ge=1, le=3, description="1=burn (перегрузка/ошибка), 2=low (недостаточно/неверно), 3=success (успех)")
+    topic: str = Field("circuit", description="'circuit' | 'ballistics' | 'pendulum' | 'thermodynamics'")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Параметры эксперимента")
     lang: str = Field("ru", description="'ru' или 'ky'")
+    question: Optional[str] = Field(None, description="Дополнительный вопрос или контекст")
+    circuit_state: Optional[int] = Field(None, description="1=burn, 2=low, 3=success")
 
 
 class AskMentorResponse(BaseModel):
     success: bool = True
     answer: str
-    circuit_state: int
+    topic: str = "circuit"
+    circuit_state: Optional[int] = None
     source: str = "ai"
 
 
-def generate_mentor_advice(question: str, circuit_state: int, lang: str) -> dict:
-    """Генерация совета ментора через Google Gemini API (при наличии ключа) или экспертную систему."""
-    lang_clean = "ky" if lang.strip().lower() == "ky" else "ru"
+def generate_mentor_advice(req: AskMentorRequest) -> dict:
+    """Педагогическое объяснение физического принципа в стиле Brilliant / Khan Academy."""
+    lang_clean = "ky" if req.lang.strip().lower() == "ky" else "ru"
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
     if gemini_key:
         try:
             target_lang_name = "кыргызском" if lang_clean == "ky" else "русском"
             prompt = (
-                f"Ты — дружелюбный AI-наставник физической лаборатории FluxLab для школьников 9-11 классов. "
+                f"Ты — преподаватель физики мирового уровня в стиле Brilliant.org и Khan Academy. "
+                f"Объясни фундаментальный физический закон максимально понятно, наглядно и без искусственных клише. "
                 f"Отвечай на {target_lang_name} языке. "
-                f"Состояние эксперимента: {circuit_state} (1=перегрузка/сгорело, 2=недостаточно параметров/не тот компонент, 3=успех/безопасный режим). "
-                f"Вопрос/контекст: '{question}'. "
-                f"Дай краткий (2-4 предложения), ободряющий и физически точный совет с упоминанием физического закона (закон Ома, делитель напряжения, стабилизация, диод)."
+                f"Тема: '{req.topic}'. "
+                f"Параметры эксперимента: {json.dumps(req.params, ensure_ascii=False)}. "
+                f"Дополнительный контекст: {req.question or ''}. "
+                f"Требование: дай лаконичное (2-3 предложения) глубокое концептуальное объяснение сути физического явления (почему так происходит)."
             )
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
             payload = json.dumps({
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.4, "maxOutputTokens": 300}
+                "generationConfig": {"temperature": 0.3, "maxOutputTokens": 350}
             }).encode("utf-8")
-            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=4.0) as resp:
+            h_req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(h_req, timeout=4.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 if text:
-                    return {"success": True, "answer": text, "circuit_state": circuit_state, "source": "gemini"}
+                    return {
+                        "success": True,
+                        "answer": text,
+                        "topic": req.topic,
+                        "circuit_state": req.circuit_state,
+                        "source": "gemini",
+                    }
         except Exception:
-            pass  # Переход к экспертной системе при сбое или отсутствии сети
+            pass
 
-    q_lower = question.lower()
+    t_key = req.topic.lower().strip()
+
     if lang_clean == "ky":
-        if circuit_state == 3:
-            answer = "Азаматсың! Чынжыр эң туура жыйналды. Ток жана чыңалуу коопсуз деңгээлде, прибор толук күчүндө иштеп жатат."
-        elif circuit_state == 1:
-            if "роутер" in q_lower or "делител" in q_lower or "бөлгүч" in q_lower or "24" in q_lower:
-                answer = "Чыңалуу өтө жогору (24 В)! Түз туташтырсаң роутер күйүп кетет. Чыңалууну 12 В чейин азайтуу үчүн эки резистордон турган чыңалуу бөлгүчтү колдон."
-            elif "шамал" in q_lower or "стабилизатор" in q_lower or "20" in q_lower:
-                answer = "Шамалдын күчү менен чыңалуу 20 В чейин секирет! Резистор секириктерди кармай албайт. Туруктуу 5 В кармоо үчүн чыңалуу стабилизаторун орнотушуң керек."
-            elif "диод" in q_lower or "күн" in q_lower or "насос" in q_lower or "түн" in q_lower:
-                answer = "Түнкүсүн аккумулятордон күн панелине карай тескери ток агып жатат! Токту бир гана багытта өткөрүүчү жарым өткөргүч диодду чынжырга кошуп коргоо керек."
-            else:
-                answer = "Чынжырдагы ток өтө күчтүү же коргоо жок! Жылуулук кубаттуулугу P = U²/R өтө чоң болуп, прибор күйүп кетет. Ылайыктуу деталь менен корго."
+        if "circuit" in t_key:
+            answer = (
+                "Электр чынжырында резисторлор чыңалууну бөлгүч катары иштеп (U_чыг = U_кир · R2 / (R1 + R2)), ашыкча чыңалууну жылуулукка айлантат. "
+                "Стабилизатор чыңалуу секириктерине карабастан туруктуу 5 В кармап турат. "
+                "Ал эми жарым өткөргүч диод p-n өтүүсү аркылуу токту бир гана багытта өткөрүп, тескери ток агымынан коргойт."
+            )
+        elif "ballistics" in t_key or "kinematics" in t_key:
+            answer = (
+                "Вакуумда учуу аралыгы горизонтко 45° бурчта максималдуу болот (L = v0² sin(2α) / g), анткени горизонталдуу жана вертикалдуу ылдамдыктар эң оптималдуу айкалышат. "
+                "Абанын каршылыгы бар чөйрөдө (F ~ v²) ылдамдык басаңдап, траекториянын түшүү бөлүгү тик болуп калат жана оптималдуу бурч 35°-42° чейин төмөндөйт."
+            )
+        elif "pendulum" in t_key or "wave" in t_key:
+            answer = (
+                "Маятниктин термелүү мезгили T = 2π√(L/g) жиптин узундугунан жана гравитациядан гана көз каранды болуп, жүктүн массасына көз каранды эмес. "
+                "Галилейдин эквиваленттүүлүк принцибине ылайык, оордук күчү да, инерттүүлүк да массага түз пропорционал болгондуктан, массалар кыскарып кетет. "
+                "Өчүү коэффициенти термелүүнүн жыштыгын дээрлик өзгөртпөстөн, амплитудасын экспоненциалдуу түрдө азайтат."
+            )
+        elif "thermodynamics" in t_key or "gas" in t_key:
+            answer = (
+                "Термодинамиканын биринчи башталышы боюнча (Q = ΔU + W), берилген жылуулук ички энергияны өзгөртүүгө жана газдын механикалык жумушуна жумшалат. "
+                "Газдын жумушу W = ∫P dV диаграммадагы P-V ийри сызыгынын астындагы аянтка барабар. "
+                "Изотермикалык процессте температура туруктуу болгондуктан, ички энергия өзгөрбөйт (ΔU = 0) жана бардык жылуулук жумушка айланат."
+            )
         else:
-            answer = "Чыңалуу же ток жетишсиз болуп жатат, же деталь туура келген жок. Параметрлерди текшерип, схеманы тууралап көр."
+            answer = "Физикалык кубулуш жаратылыштын фундаменталдык мыйзамдарына жана сакталуу принциптерине негизделген."
     else:
-        if circuit_state == 3:
-            answer = "Отличная работа! Схема собрана идеально: напряжение и ток находятся в безопасных рабочих диапазонах, прибор защищён и функционирует в штатном режиме."
-        elif circuit_state == 1:
-            if "роутер" in q_lower or "делител" in q_lower or "24" in q_lower:
-                answer = "Напряжение 24 В слишком велико для 12-вольтового роутера! Напрямую прибор сгорит. Используй делитель напряжения из двух резисторов (U_out = U_in · R₂/(R₁+R₂)), чтобы снизить напряжение ровно вдвое."
-            elif "стабилизатор" in q_lower or "ветер" in q_lower or "ветро" in q_lower or "20" in q_lower:
-                answer = "Ветер усиливается, и напряжение генератора скачет до 20 В. Обычный резистор дает лишь постоянное падение напряжения, но не сглаживает скачки. Нужен стабилизатор напряжения, удерживающий ровно 5 В при любом входном импульсе!"
-            elif "диод" in q_lower or "панел" in q_lower or "ноч" in q_lower or "обратн" in q_lower:
-                answer = "Ночью панель не генерирует ЭДС, и заряженный аккумулятор разряжается обратно в неё. Установи полупроводниковый диод: его p-n переход пропускает ток только вперёд и надёжно блокирует опасный обратный ток."
-            else:
-                answer = "Внимание: опасный режим! Превышение напряжения ведёт к тепловому пробою по закону Джоуля-Ленца (P = U²/R). Добавь в цепь защитный элемент (резистор нужного номинала, стабилизатор или диод)."
+        if "circuit" in t_key:
+            answer = (
+                "В электрической цепи резисторы работают как делители потенциала: U_вых = U_вх · R2 / (R1 + R2), преобразуя избыточное напряжение в тепловую энергию. "
+                "Линейный стабилизатор динамически удерживает фиксированные 5.0 В независимо от входных скачков. "
+                "Полупроводниковый диод за счёт p-n перехода обладает односторонней проводимостью, гарантируя защиту источника от опасного обратного тока."
+            )
+        elif "ballistics" in t_key or "kinematics" in t_key:
+            answer = (
+                "В вакууме дальность полёта максимальна под углом 45° (L = v0² sin(2α) / g), так как время полёта и горизонтальная скорость оптимально согласованы. "
+                "В реальной атмосфере квадратичное сопротивление воздуха (F_сопр ~ v²) сильнее тормозит тело на нисходящей траектории, поэтому практический оптимум угла смещается к 38°-42°, делая спуск более крутым."
+            )
+        elif "pendulum" in t_key or "wave" in t_key:
+            answer = (
+                "Период малых колебаний маятника T = 2π√(L/g) зависит исключительно от длины подвеса L и гравитации g, но абсолютно не зависит от массы груза. "
+                "Это прямое следствие принципа эквивалентности: сила тяжести пропорциональна массе, но и инертность тела пропорциональна массе (F=ma), поэтому масса сокращается. "
+                "Затухание экспоненциально уменьшает амплитуду, практически не влияя на частоту колебаний."
+            )
+        elif "thermodynamics" in t_key or "gas" in t_key:
+            answer = (
+                "Согласно Первому началу термодинамики (Q = ΔU + W), подведённое тепло идёт на изменение внутренней энергии газа и совершение работы расширения. "
+                "Работа W = ∫P dV численно равна площади под кривой на P-V диаграмме. "
+                "В изотермическом процессе температура постоянна, поэтому внутренняя энергия сохраняется (ΔU = 0), и всё тепло преобразуется в полезную механическую работу."
+            )
         else:
-            answer = "Схема не работает в полную мощность: тока или напряжения недостаточно для запуска потребителя, либо выбранный элемент не подходит под условия задачи."
+            answer = "Явление описывается фундаментальными законами сохранения энергии, импульса и электродинамики."
 
-    return {"success": True, "answer": answer, "circuit_state": circuit_state, "source": "expert_system"}
+    return {
+        "success": True,
+        "answer": answer,
+        "topic": req.topic,
+        "circuit_state": req.circuit_state,
+        "source": "pedagogical_engine",
+    }
 
 
 app = FastAPI(
@@ -715,7 +757,7 @@ async def health():
     include_in_schema=False,
 )
 async def ask_mentor(req: AskMentorRequest):
-    data = generate_mentor_advice(req.question, req.circuit_state, req.lang)
+    data = generate_mentor_advice(req)
     return AskMentorResponse(**data)
 
 
