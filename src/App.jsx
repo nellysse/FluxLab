@@ -157,7 +157,7 @@ export default function App() {
     setAiText('');
 
     try {
-      const res = await fetch('https://fluxlab-3g8h.onrender.com/', {
+      const res = await fetch('https://fluxlab-3g8h.onrender.com/api/ask-mentor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
